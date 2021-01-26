@@ -7,3 +7,9 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+env_logger = "0.8"
+log = "0.4"
+postgres-protocol = { git = "https://github.com/Martichou/rust-postgres", branch = "replication" }
+rand = "0.8"
+tokio-postgres = { git = "https://github.com/Martichou/rust-postgres", branch = "replication" }
+tokio = { version = "0.3.6", features = ["full"] }
