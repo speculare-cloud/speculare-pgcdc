@@ -4,16 +4,19 @@ extern crate log;
 use futures::StreamExt;
 use postgres_protocol::message::backend::ReplicationMessage;
 use std::time::{Duration, UNIX_EPOCH};
-use tokio::sync::*;
+use tokio::sync::broadcast;
 use tokio_postgres::replication_client::SnapshotMode;
-use tokio_postgres::{connect_replication, Error, NoTls, ReplicationMode};
+use tokio_postgres::{connect_replication, NoTls, ReplicationMode};
 
 mod logger;
+mod server;
 
 const TIME_SEC_CONVERSION: u64 = 946_684_800;
 
-#[tokio::main]
-async fn main() -> Result<(), Error> {
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    // Load env variable from .env
+    dotenv::dotenv().ok();
     // Init the logger and set the debug level correctly
     logger::configure();
 
@@ -60,20 +63,20 @@ async fn main() -> Result<(), Error> {
     let options = &[("pretty-print", "0")];
 
     // Clean up previous runs
-    rclient.drop_replication_slot(slot_name, true).await?;
+    rclient
+        .drop_replication_slot(slot_name, true)
+        .await
+        .unwrap();
 
     // We set NoExportSnapshot
     let no_export = Some(SnapshotMode::NoExportSnapshot);
     rclient
         .create_logical_replication_slot(slot_name, true, plugin, no_export)
-        .await?;
+        .await
+        .unwrap();
 
-    let identify_system = rclient.identify_system().await?;
-
-    // We now switch to consuming the stream
-    let mut logical_stream = rclient
-        .start_logical_replication(slot_name, identify_system.xlogpos(), options)
-        .await?;
+    // Get info about the client we have
+    let identify_system = rclient.identify_system().await.unwrap();
 
     // Compute the epoch and register the last_lsn of the stream
     // last_lsn will be updated everytime we read a new value
@@ -83,35 +86,46 @@ async fn main() -> Result<(), Error> {
     // TODO - Let this while loop run in his own task/thread
     //      - Run an actix server with webSocket which listen to the tokio broadcast
     //      - Filter out which message should be sent with which info, ...
-    while let Some(replication_message) = logical_stream.next().await {
-        match replication_message? {
-            ReplicationMessage::XLogData(xlog_data) => {
-                // Extracting the json data from the ReplicationMessage
-                // converting to a String because he need to live longer than this scope
-                let json = String::from_utf8(xlog_data.data().to_vec()).unwrap();
-                info!("Json: {}", json);
+    let txc = tx.clone();
+    tokio::spawn(async move {
+        // We now switch to consuming the stream
+        let mut logical_stream = rclient
+            .start_logical_replication(slot_name, identify_system.xlogpos(), options)
+            .await
+            .unwrap();
+        // Listen for the replication stream
+        while let Some(replication_message) = logical_stream.next().await {
+            match replication_message.unwrap() {
+                ReplicationMessage::XLogData(xlog_data) => {
+                    // Extracting the json data from the ReplicationMessage
+                    // converting to a String because he need to live longer than this scope
+                    let json = String::from_utf8(xlog_data.data().to_vec()).unwrap();
+                    info!("Json: {}", json);
 
-                // Send the JSON to every consumer (each on a different task)
-                tx.send(json.to_owned()).unwrap();
+                    // Send the JSON to every consumer (each on a different task)
+                    txc.send(json.to_owned()).unwrap();
 
-                // Update the last_lsn as we've sent the info
-                last_lsn = xlog_data.wal_end().into();
-                info!("Last_lsn == {}", last_lsn);
-            }
-            ReplicationMessage::PrimaryKeepAlive(keepalive) => {
-                // If the keepalive reply is 1, this means postgres is waiting for our reply
-                // before cutting off the connection
-                if keepalive.reply() == 1 {
-                    warn!("sending keepalive reply with last_lsn == {}", last_lsn);
-                    let ts = epoch.elapsed().unwrap().as_micros() as i64;
-                    logical_stream
-                        .as_mut()
-                        .standby_status_update(last_lsn, last_lsn, last_lsn, ts, 0)
-                        .await?;
+                    // Update the last_lsn as we've sent the info
+                    last_lsn = xlog_data.wal_end().into();
+                    info!("Last_lsn == {}", last_lsn);
                 }
+                ReplicationMessage::PrimaryKeepAlive(keepalive) => {
+                    // If the keepalive reply is 1, this means postgres is waiting for our reply
+                    // before cutting off the connection
+                    if keepalive.reply() == 1 {
+                        warn!("sending keepalive reply with last_lsn == {}", last_lsn);
+                        let ts = epoch.elapsed().unwrap().as_micros() as i64;
+                        logical_stream
+                            .as_mut()
+                            .standby_status_update(last_lsn, last_lsn, last_lsn, ts, 0)
+                            .await
+                            .unwrap();
+                    }
+                }
+                _ => (),
             }
-            _ => (),
         }
-    }
-    Ok(())
+    });
+
+    server::server(tx).await
 }

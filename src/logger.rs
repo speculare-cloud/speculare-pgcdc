@@ -8,9 +8,9 @@ pub fn configure() {
         std::env::set_var(
             "RUST_LOG",
             if cfg!(debug_assertions) {
-                "info"
+                "info,actix_server=info,actix_web=info"
             } else {
-                "error"
+                "error,actix_server=error,actix_web=error"
             },
         );
     }
