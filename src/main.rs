@@ -4,6 +4,7 @@ extern crate log;
 use futures::StreamExt;
 use postgres_protocol::message::backend::ReplicationMessage;
 use std::time::{Duration, UNIX_EPOCH};
+use tokio::sync::*;
 use tokio_postgres::replication_client::SnapshotMode;
 use tokio_postgres::{connect_replication, Error, NoTls, ReplicationMode};
 
@@ -31,6 +32,28 @@ async fn main() -> Result<(), Error> {
         }
     });
 
+    // Spawn the broadcaster
+    // Multi producer - multi consumer, each value will be seen by each consumer
+    let (tx, _) = broadcast::channel(16);
+
+    // Spawn listener for changes
+    for x in 0..10 {
+        // Clone the sender (tx) and create a new subsription to it
+        // which will be passed to the tokio task
+        let mut rxc = tx.clone().subscribe();
+        tokio::spawn(async move {
+            // Wait for rxc.recv() to get message from tx (broadcast producer)
+            loop {
+                let value = rxc.recv().await;
+                if value.is_err() {
+                    error!("Task #{} just got an error: {}", x, value.err().unwrap());
+                } else {
+                    info!("Task #{} got: {}", x, value.unwrap());
+                }
+            }
+        });
+    }
+
     // Define constants for the logical slot
     let slot_name = "pgcdc_repl";
     let plugin = "wal2json";
@@ -52,19 +75,32 @@ async fn main() -> Result<(), Error> {
         .start_logical_replication(slot_name, identify_system.xlogpos(), options)
         .await?;
 
+    // Compute the epoch and register the last_lsn of the stream
+    // last_lsn will be updated everytime we read a new value
     let epoch = UNIX_EPOCH + Duration::from_secs(TIME_SEC_CONVERSION);
     let mut last_lsn = identify_system.xlogpos();
 
+    // TODO - Let this while loop run in his own task/thread
+    //      - Run an actix server with webSocket which listen to the tokio broadcast
+    //      - Filter out which message should be sent with which info, ...
     while let Some(replication_message) = logical_stream.next().await {
         match replication_message? {
             ReplicationMessage::XLogData(xlog_data) => {
-                let json = std::str::from_utf8(xlog_data.data()).unwrap();
+                // Extracting the json data from the ReplicationMessage
+                // converting to a String because he need to live longer than this scope
+                let json = String::from_utf8(xlog_data.data().to_vec()).unwrap();
                 info!("Json: {}", json);
 
+                // Send the JSON to every consumer (each on a different task)
+                tx.send(json.to_owned()).unwrap();
+
+                // Update the last_lsn as we've sent the info
                 last_lsn = xlog_data.wal_end().into();
                 info!("Last_lsn == {}", last_lsn);
             }
             ReplicationMessage::PrimaryKeepAlive(keepalive) => {
+                // If the keepalive reply is 1, this means postgres is waiting for our reply
+                // before cutting off the connection
                 if keepalive.reply() == 1 {
                     warn!("sending keepalive reply with last_lsn == {}", last_lsn);
                     let ts = epoch.elapsed().unwrap().as_micros() as i64;
