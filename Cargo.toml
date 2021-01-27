@@ -8,8 +8,8 @@ edition = "2018"
 
 [dependencies]
 env_logger = "0.8"
+futures = "0.3"
 log = "0.4"
 postgres-protocol = { git = "https://github.com/Martichou/rust-postgres", branch = "replication" }
-rand = "0.8"
 tokio-postgres = { git = "https://github.com/Martichou/rust-postgres", branch = "replication" }
-tokio = { version = "0.3.6", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
