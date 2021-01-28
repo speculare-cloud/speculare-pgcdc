@@ -20,11 +20,12 @@ const TIME_SEC_CONVERSION: u64 = 946_684_800;
 async fn main() -> std::io::Result<()> {
     // Load env variable from .env
     dotenv::dotenv().ok();
+
     // Init the logger and set the debug level correctly
     logger::configure();
 
     // Connection information to postgres
-    let conninfo = "host=localhost user=postgres dbname=pgcdc password=password";
+    let conninfo = &std::env::var("CONNINFO").expect("BINDING must be set");
 
     // Form replication connection
     let (mut rclient, rconnection) = connect_replication(conninfo, NoTls, ReplicationMode::Logical)
@@ -42,24 +43,6 @@ async fn main() -> std::io::Result<()> {
     // Multi producer - multi consumer, each value will be seen by each consumer
     let (tx, _) = broadcast::channel(16);
     let txc = tx.clone();
-
-    // // Spawn listener for changes
-    // for x in 0..10 {
-    //     // Clone the sender (tx) and create a new subsription to it
-    //     // which will be passed to the tokio task
-    //     let mut rxc = tx.subscribe();
-    //     tokio::spawn(async move {
-    //         // Wait for rxc.recv() to get message from tx (broadcast producer)
-    //         loop {
-    //             let value = rxc.recv().await;
-    //             if value.is_err() {
-    //                 error!("Task #{} just got an error: {}", x, value.err().unwrap());
-    //             } else {
-    //                 info!("Task #{} got: {}", x, value.unwrap());
-    //             }
-    //         }
-    //     });
-    // }
 
     // Define constants for the logical slot
     let slot_name = "pgcdc_repl";
@@ -88,29 +71,26 @@ async fn main() -> std::io::Result<()> {
     let mut last_lsn = identify_system.xlogpos();
 
     // Start chat server actor
-    let ws_server = ws_server::ChatServer::new().start();
+    let ws_server = ws_server::WsServer::new().start();
     let wsc = ws_server.clone();
 
     tokio::spawn(async move {
         let mut rx = txc.subscribe();
         loop {
             let value = rx.recv().await;
-            if value.is_err() {
-                error!("Task just got an error: {}", value.err().unwrap());
-            } else {
-                info!("Task got: {}", value.unwrap());
+            match value {
+                Ok(val) => {
+                    trace!("Dispatcher task got: {}", val);
+                    ws_server.do_send(ws_server::ClientMessage {
+                        msg: val,
+                        table: "test_table".to_owned(),
+                    });
+                }
+                Err(err) => error!("Task just got an error: {}", err),
             }
-            ws_server.do_send(ws_server::ClientMessage {
-                id: 1,
-                msg: "Hello".to_owned(),
-                room: "Main".to_owned(),
-            });
         }
     });
 
-    // TODO - Let this while loop run in his own task/thread
-    //      - Run an actix server with webSocket which listen to the tokio broadcast
-    //      - Filter out which message should be sent with which info, ...
     tokio::spawn(async move {
         // We now switch to consuming the stream
         let mut logical_stream = rclient
@@ -124,15 +104,11 @@ async fn main() -> std::io::Result<()> {
                     // Extracting the json data from the ReplicationMessage
                     // converting to a String because he need to live longer than this scope
                     let json = String::from_utf8(xlog_data.data().to_vec()).unwrap();
-                    info!("Json: {}", json);
+                    trace!("Json: {}", json);
 
-                    // Send the JSON to every consumer (each on a different task)
+                    // Send the JSON to dispatcher consumer
+                    // using this solution for the queue of the mpmc
                     tx.send(json.to_owned()).unwrap();
-                    // ws_server.do_send(ws_server::ClientMessage {
-                    //     id: 1,
-                    //     msg: json,
-                    //     room: "Main".to_owned(),
-                    // });
 
                     // Update the last_lsn as we've sent the info
                     last_lsn = xlog_data.wal_end().into();

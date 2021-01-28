@@ -23,7 +23,7 @@ async fn hello_world() -> impl actix_web::Responder {
 }
 
 /// Construct and run the actix server instance
-pub async fn server(wsc: actix::Addr<ws_server::ChatServer>) -> std::io::Result<()> {
+pub async fn server(wsc: actix::Addr<ws_server::WsServer>) -> std::io::Result<()> {
     // Construct the HttpServer instance.
     // Passing the pool of PgConnection and defining the logger / compress middleware.
     let serv = HttpServer::new(move || {
