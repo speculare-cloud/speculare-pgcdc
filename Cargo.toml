@@ -7,16 +7,20 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+actix = "0.11.0-beta.1"
 dotenv = "0.15"
 env_logger = "0.8"
 futures = "0.3"
 log = "0.4"
 openssl = "0.10"
+rand = "0.8"
 postgres-protocol = { git = "https://github.com/Martichou/rust-postgres", branch = "replication" }
 tokio-postgres = { git = "https://github.com/Martichou/rust-postgres", branch = "replication" }
 tokio = "1"
 
 [dependencies.actix-web]
-git = "https://github.com/actix/actix-web"
-tag = "web-v4.0.0-beta.1"
+path = "./actix-web"
 features = ["openssl"]
+
+[dependencies.actix-web-actors]
+path = "./actix-web/actix-web-actors"

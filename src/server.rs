@@ -1,6 +1,8 @@
+use crate::ws_client;
+use crate::ws_server;
+
 use actix_web::{middleware, App, HttpServer};
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
-use tokio::sync::broadcast;
 
 /// Return the SslAcceptorBuilder needed for Actix to be binded on HTTPS
 ///
@@ -21,16 +23,16 @@ async fn hello_world() -> impl actix_web::Responder {
 }
 
 /// Construct and run the actix server instance
-pub async fn server(tx: broadcast::Sender<std::string::String>) -> std::io::Result<()> {
+pub async fn server(wsc: actix::Addr<ws_server::ChatServer>) -> std::io::Result<()> {
     // Construct the HttpServer instance.
     // Passing the pool of PgConnection and defining the logger / compress middleware.
     let serv = HttpServer::new(move || {
         App::new()
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::default())
-            .data(tx.clone())
+            .data(wsc.clone())
             .route("/", actix_web::web::get().to(hello_world))
-        //.configure(routes::routes)
+            .route("/ws", actix_web::web::get().to(ws_client::ws_index))
     });
     // Bind and run the server on HTTP or HTTPS depending on the mode of compilation.
     let binding = std::env::var("BINDING").expect("BINDING must be set");
