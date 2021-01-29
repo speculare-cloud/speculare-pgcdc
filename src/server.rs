@@ -17,12 +17,7 @@ fn get_ssl_builder() -> openssl::ssl::SslAcceptorBuilder {
     builder
 }
 
-/// Dummy hello_world HTTP response
-async fn hello_world() -> impl actix_web::Responder {
-    "Hello World!"
-}
-
-/// Construct and run the actix server instance
+/// Construct and run the actix server instance.
 pub async fn server(wsc: actix::Addr<ws_server::WsServer>) -> std::io::Result<()> {
     // Construct the HttpServer instance.
     // Passing the pool of PgConnection and defining the logger / compress middleware.
@@ -31,7 +26,7 @@ pub async fn server(wsc: actix::Addr<ws_server::WsServer>) -> std::io::Result<()
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::default())
             .data(wsc.clone())
-            .route("/", actix_web::web::get().to(hello_world))
+            .route("/ping", actix_web::web::get().to(|| async { "pong" }))
             .route("/ws", actix_web::web::get().to(ws_client::ws_index))
     });
     // Bind and run the server on HTTP or HTTPS depending on the mode of compilation.
