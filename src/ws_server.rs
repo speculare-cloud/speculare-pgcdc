@@ -12,6 +12,7 @@ pub struct WsData(pub String);
 #[rtype(usize)]
 pub struct Connect {
     pub addr: Recipient<WsData>,
+    pub table: String,
 }
 
 /// Session is disconnected
@@ -78,7 +79,7 @@ impl Handler<Connect> for WsServer {
         self.sessions.insert(id, msg.addr);
         // insert id and table in the tables HashMap
         self.tables
-            .entry("test_table".to_owned())
+            .entry(msg.table)
             .or_insert_with(HashSet::new)
             .insert(id);
         // send id back

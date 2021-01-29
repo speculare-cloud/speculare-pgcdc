@@ -46,6 +46,7 @@ impl Actor for WsChatSession {
         self.addr
             .send(ws_server::Connect {
                 addr: addr.recipient(),
+                table: "test_table".to_owned(),
             })
             .into_actor(self)
             .then(|res, act, ctx| {
