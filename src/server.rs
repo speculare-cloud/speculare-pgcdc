@@ -40,9 +40,10 @@ pub async fn server(wsc: actix::Addr<ws_server::WsServer>) -> std::io::Result<()
         } else {
             info!("Server started as HTTP");
         }
-        serv.bind(binding)?.run().await
+        serv.bind(binding)?.run();
     } else {
         info!("Server started as HTTPS");
-        serv.bind_openssl(binding, get_ssl_builder())?.run().await
+        serv.bind_openssl(binding, get_ssl_builder())?.run();
     }
+    Ok(())
 }

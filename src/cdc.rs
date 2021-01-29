@@ -2,27 +2,35 @@ use futures::StreamExt;
 use postgres_protocol::message::backend::ReplicationMessage;
 use std::time::{Duration, UNIX_EPOCH};
 use tokio::sync::broadcast::Sender;
+use tokio::sync::oneshot::Sender as OSender;
 use tokio_postgres::replication_client::{ReplicationClient, SnapshotMode};
 use tokio_postgres::{connect_replication, NoTls, ReplicationMode};
 
 const TIME_SEC_CONVERSION: u64 = 946_684_800;
 
 /// Open a replication connection to the Postgresql server and maintain the connection open on a task.
-pub async fn connect_replica() -> ReplicationClient {
+pub async fn connect_replica(txo: OSender<tokio_postgres::Error>) -> ReplicationClient {
     // Connection information to postgres
     let conninfo = &std::env::var("CONNINFO").expect("BINDING must be set");
 
     // Form replication connection
-    let (rclient, rconnection) = connect_replication(conninfo, NoTls, ReplicationMode::Logical)
-        .await
-        .unwrap();
+    let (rclient, rconnection) =
+        match connect_replication(conninfo, NoTls, ReplicationMode::Logical).await {
+            Ok((rc, rco)) => (rc, rco),
+            Err(err) => {
+                error!("Fatal error, postgres connection: {}", err);
+                std::process::exit(1);
+            }
+        };
 
     // Spawn connection to run on its own
     tokio::spawn(async move {
         // rconnection will never return except on Error
         // as long as no error, the connection is open.
-        if let Err(e) = rconnection.await {
-            panic!("connection error: {}", e);
+        if let Err(err) = rconnection.await {
+            error!("Fatal error, postgres connection: {}", err);
+            txo.send(err).unwrap();
+            std::process::exit(1);
         }
     });
 
@@ -82,8 +90,8 @@ pub fn init_cdc_listener(mut rclient: ReplicationClient, tx: Sender<String>) {
 
         // Listen for the replication stream
         while let Some(replication_message) = logical_stream.next().await {
-            match replication_message.unwrap() {
-                ReplicationMessage::XLogData(xlog_data) => {
+            match replication_message {
+                Ok(ReplicationMessage::XLogData(xlog_data)) => {
                     // Extracting the json data from the ReplicationMessage
                     // converting to a String because he need to live longer than this scope
                     let json = String::from_utf8(xlog_data.data().to_vec()).unwrap();
@@ -102,7 +110,7 @@ pub fn init_cdc_listener(mut rclient: ReplicationClient, tx: Sender<String>) {
                     last_lsn = xlog_data.wal_end().into();
                     trace!("Last_lsn == {}", last_lsn);
                 }
-                ReplicationMessage::PrimaryKeepAlive(keepalive) => {
+                Ok(ReplicationMessage::PrimaryKeepAlive(keepalive)) => {
                     // If the keepalive reply is 1, this means postgres is waiting for our reply
                     // before cutting off the connection
                     if keepalive.reply() == 1 {
@@ -115,6 +123,7 @@ pub fn init_cdc_listener(mut rclient: ReplicationClient, tx: Sender<String>) {
                             .unwrap();
                     }
                 }
+                Err(err) => error!("Replication stream error: {}", err),
                 _ => (),
             }
         }

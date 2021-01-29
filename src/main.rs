@@ -2,7 +2,7 @@
 extern crate log;
 
 use actix::Actor;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, oneshot};
 
 mod cdc;
 mod logger;
@@ -19,9 +19,12 @@ async fn main() -> std::io::Result<()> {
     // Init the logger and set the debug level correctly
     logger::configure();
 
+    // Create a oneshot channel to handle postgresql connection failures
+    let (txo, rxo) = oneshot::channel();
+
     // Form replication connection
     // And keep the connection open
-    let rclient = cdc::connect_replica().await;
+    let rclient = cdc::connect_replica(txo).await;
 
     // A multi-producer, multi-consumer broadcast queue. Each sent value is seen by all consumers.
     let (tx, _) = broadcast::channel(16);
@@ -37,5 +40,10 @@ async fn main() -> std::io::Result<()> {
     cdc::init_cdc_listener(rclient, tx);
 
     // Start the Actix server and so the websocket client
-    server::server(ws_server).await
+    server::server(ws_server).await?;
+
+    // Wait for the postgres connection to be closed
+    // Allow us to panic! and shutdown all task if needed
+    rxo.await.unwrap();
+    Ok(())
 }
