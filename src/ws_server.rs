@@ -18,88 +18,6 @@ pub struct Connect {
     pub watch_for: WsWatchFor,
 }
 
-/// Session is disconnected
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct Disconnect {
-    pub id: usize,
-    pub watch_for: WsWatchFor,
-}
-
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct ClientMessage {
-    /// Message
-    pub msg: String,
-    /// Table name
-    pub change_table: String,
-    /// Change type
-    pub change_type: ChangeType,
-}
-
-pub struct WsServer {
-    /// Contains the id and the addr of the Ws reciever
-    sessions: HashMap<usize, Recipient<WsData>>,
-    /// HashMap of who is listening which table, and name depend on the change type
-    insert_tables: HashMap<String, HashSet<usize>>,
-    update_tables: HashMap<String, HashSet<usize>>,
-    delete_tables: HashMap<String, HashSet<usize>>,
-    /// Random generator thread
-    rng: ThreadRng,
-}
-
-impl WsServer {
-    pub fn new() -> WsServer {
-        WsServer {
-            sessions: HashMap::new(),
-            insert_tables: HashMap::new(),
-            update_tables: HashMap::new(),
-            delete_tables: HashMap::new(),
-            rng: rand::thread_rng(),
-        }
-    }
-}
-
-impl WsServer {
-    /// Send message to all websocket listening for table
-    fn send_message(&self, change_table: &str, change_type: ChangeType, message: &str) {
-        let sessions: Option<&HashSet<usize>>;
-        match change_type {
-            // Get all sessions for the table we're sending event
-            ChangeType::INSERT => {
-                sessions = self.insert_tables.get(change_table);
-            }
-            ChangeType::UPDATE => {
-                sessions = self.update_tables.get(change_table);
-            }
-            ChangeType::DELETE => {
-                sessions = self.delete_tables.get(change_table);
-            }
-            // If none of the above, we don't handle it
-            _ => {
-                error!("Change {:?} not handled (yet).", change_type);
-                return;
-            }
-        }
-        if sessions.is_none() {
-            return;
-        }
-        // For every sessions ID in the tables HashMap
-        for id in sessions.unwrap() {
-            // Get the Addr of the WS from the sessions hashmap by the id
-            if let Some(addr) = self.sessions.get(id) {
-                // Send the message
-                let _ = addr.do_send(WsData(message.to_owned()));
-            }
-        }
-    }
-}
-
-/// Make actor from `WsServer`
-impl Actor for WsServer {
-    type Context = Context<Self>;
-}
-
 /// Handler for Connect message.
 ///
 /// Register new session and assign unique id to this session
@@ -138,6 +56,14 @@ impl Handler<Connect> for WsServer {
     }
 }
 
+/// Session is disconnected
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct Disconnect {
+    pub id: usize,
+    pub watch_for: WsWatchFor,
+}
+
 /// Handler for Disconnect message.
 ///
 /// De-registering a session and removing it from the listener for his table
@@ -168,11 +94,84 @@ impl Handler<Disconnect> for WsServer {
     }
 }
 
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct ClientMessage {
+    /// Message
+    pub msg: String,
+    /// Table name
+    pub change_table: String,
+    /// Change type
+    pub change_type: ChangeType,
+}
+
 /// Handler for Message message.
 impl Handler<ClientMessage> for WsServer {
     type Result = ();
 
     fn handle(&mut self, msg: ClientMessage, _: &mut Context<Self>) {
         self.send_message(&msg.change_table, msg.change_type, msg.msg.as_str());
+    }
+}
+
+pub struct WsServer {
+    /// Contains the id and the addr of the Ws reciever
+    sessions: HashMap<usize, Recipient<WsData>>,
+    /// HashMap of who is listening which table, and name depend on the change type
+    insert_tables: HashMap<String, HashSet<usize>>,
+    update_tables: HashMap<String, HashSet<usize>>,
+    delete_tables: HashMap<String, HashSet<usize>>,
+    /// Random generator thread
+    rng: ThreadRng,
+}
+
+/// Make actor from `WsServer`
+impl Actor for WsServer {
+    type Context = Context<Self>;
+}
+
+impl WsServer {
+    /// Construct a new instance of WsServer Actor
+    pub fn new() -> WsServer {
+        WsServer {
+            sessions: HashMap::new(),
+            insert_tables: HashMap::new(),
+            update_tables: HashMap::new(),
+            delete_tables: HashMap::new(),
+            rng: rand::thread_rng(),
+        }
+    }
+
+    /// Send message to all websocket listening for table
+    fn send_message(&self, change_table: &str, change_type: ChangeType, message: &str) {
+        let sessions: Option<&HashSet<usize>>;
+        match change_type {
+            // Get all sessions for the table we're sending event
+            ChangeType::INSERT => {
+                sessions = self.insert_tables.get(change_table);
+            }
+            ChangeType::UPDATE => {
+                sessions = self.update_tables.get(change_table);
+            }
+            ChangeType::DELETE => {
+                sessions = self.delete_tables.get(change_table);
+            }
+            // If none of the above, we don't handle it
+            _ => {
+                error!("Change {:?} not handled (yet).", change_type);
+                return;
+            }
+        }
+        if sessions.is_none() {
+            return;
+        }
+        // For every sessions ID in the tables HashMap
+        for id in sessions.unwrap() {
+            // Get the Addr of the WS from the sessions hashmap by the id
+            if let Some(addr) = self.sessions.get(id) {
+                // Send the message
+                let _ = addr.do_send(WsData(message.to_owned()));
+            }
+        }
     }
 }
