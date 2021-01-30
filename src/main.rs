@@ -27,7 +27,7 @@ async fn main() -> std::io::Result<()> {
     // A multi-producer, multi-consumer broadcast queue. Each sent value is seen by all consumers.
     let (tx, _) = broadcast::channel(16);
 
-    // Start chat server actor
+    // Start WsServer actor
     let ws_server = ws_server::WsServer::new().start();
 
     // Clone the Sender of the broadcast to allow it to be used in two async context

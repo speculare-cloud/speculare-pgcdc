@@ -88,6 +88,8 @@ impl Handler<Connect> for WsServer {
 }
 
 /// Handler for Disconnect message.
+///
+/// De-registering a session and removing it from the listener for his table
 impl Handler<Disconnect> for WsServer {
     type Result = ();
 

@@ -22,7 +22,7 @@ pub async fn ws_index(
         return Ok(HttpResponse::BadRequest().finish());
     }
     ws::start(
-        WsChatSession {
+        WsSession {
             id: 0,
             hb: Instant::now(),
             addr: srv.get_ref().clone(),
@@ -33,7 +33,7 @@ pub async fn ws_index(
     )
 }
 
-struct WsChatSession {
+struct WsSession {
     /// unique session id
     id: usize,
     /// Client must send ping at least once per 10 seconds (CLIENT_TIMEOUT), otherwise we drop connection.
@@ -44,7 +44,7 @@ struct WsChatSession {
     table: String,
 }
 
-impl Actor for WsChatSession {
+impl Actor for WsSession {
     type Context = ws::WebsocketContext<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
@@ -74,7 +74,7 @@ impl Actor for WsChatSession {
 }
 
 /// Handle messages from WsServer, we simply send it to peer websocket
-impl Handler<ws_server::WsData> for WsChatSession {
+impl Handler<ws_server::WsData> for WsSession {
     type Result = ();
 
     fn handle(&mut self, msg: ws_server::WsData, ctx: &mut Self::Context) {
@@ -83,7 +83,7 @@ impl Handler<ws_server::WsData> for WsChatSession {
 }
 
 /// WebSocket message handler
-impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsChatSession {
+impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
         match msg {
             Ok(ws::Message::Ping(msg)) => {
@@ -106,7 +106,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsChatSession {
     }
 }
 
-impl WsChatSession {
+impl WsSession {
     /// Helper method that sends ping to client every second.
     ///
     /// Also this method checks heartbeats from client
@@ -115,12 +115,12 @@ impl WsChatSession {
             // check client heartbeats
             if Instant::now().duration_since(act.hb) > CLIENT_TIMEOUT {
                 // heartbeat timed out
-                println!("Websocket Client heartbeat failed, disconnecting!");
-                // notify chat server
+                error!("Websocket Client heartbeat failed, disconnecting!");
+                // notify WsServer to drop the current act.id
                 act.addr.do_send(ws_server::Disconnect { id: act.id });
                 // stop actor
                 ctx.stop();
-                // don't try to send a ping
+                // don't send ping anymore
                 return;
             }
             ctx.ping(b"");
