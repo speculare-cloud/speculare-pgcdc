@@ -1,3 +1,6 @@
+use crate::ws_client::WsWatchFor;
+use crate::ws_utils::ChangeType;
+
 use actix::prelude::*;
 use rand::{self, rngs::ThreadRng, Rng};
 use std::collections::{HashMap, HashSet};
@@ -12,7 +15,7 @@ pub struct WsData(pub String);
 #[rtype(usize)]
 pub struct Connect {
     pub addr: Recipient<WsData>,
-    pub table: String,
+    pub watch_for: WsWatchFor,
 }
 
 /// Session is disconnected
@@ -20,6 +23,7 @@ pub struct Connect {
 #[rtype(result = "()")]
 pub struct Disconnect {
     pub id: usize,
+    pub watch_for: WsWatchFor,
 }
 
 #[derive(Message)]
@@ -28,12 +32,19 @@ pub struct ClientMessage {
     /// Message
     pub msg: String,
     /// Table name
-    pub table: String,
+    pub change_table: String,
+    /// Change type
+    pub change_type: ChangeType,
 }
 
 pub struct WsServer {
+    /// Contains the id and the addr of the Ws reciever
     sessions: HashMap<usize, Recipient<WsData>>,
-    tables: HashMap<String, HashSet<usize>>,
+    /// HashMap of who is listening which table, and name depend on the change type
+    insert_tables: HashMap<String, HashSet<usize>>,
+    update_tables: HashMap<String, HashSet<usize>>,
+    delete_tables: HashMap<String, HashSet<usize>>,
+    /// Random generator thread
     rng: ThreadRng,
 }
 
@@ -41,7 +52,9 @@ impl WsServer {
     pub fn new() -> WsServer {
         WsServer {
             sessions: HashMap::new(),
-            tables: HashMap::new(),
+            insert_tables: HashMap::new(),
+            update_tables: HashMap::new(),
+            delete_tables: HashMap::new(),
             rng: rand::thread_rng(),
         }
     }
@@ -49,12 +62,34 @@ impl WsServer {
 
 impl WsServer {
     /// Send message to all websocket listening for table
-    fn send_message(&self, table: &str, message: &str) {
-        if let Some(sessions) = self.tables.get(table) {
-            for id in sessions {
-                if let Some(addr) = self.sessions.get(id) {
-                    let _ = addr.do_send(WsData(message.to_owned()));
-                }
+    fn send_message(&self, change_table: &str, change_type: ChangeType, message: &str) {
+        let sessions: Option<&HashSet<usize>>;
+        match change_type {
+            // Get all sessions for the table we're sending event
+            ChangeType::INSERT => {
+                sessions = self.insert_tables.get(change_table);
+            }
+            ChangeType::UPDATE => {
+                sessions = self.update_tables.get(change_table);
+            }
+            ChangeType::DELETE => {
+                sessions = self.delete_tables.get(change_table);
+            }
+            // If none of the above, we don't handle it
+            _ => {
+                error!("Change {:?} not handled (yet).", change_type);
+                return;
+            }
+        }
+        if sessions.is_none() {
+            return;
+        }
+        // For every sessions ID in the tables HashMap
+        for id in sessions.unwrap() {
+            // Get the Addr of the WS from the sessions hashmap by the id
+            if let Some(addr) = self.sessions.get(id) {
+                // Send the message
+                let _ = addr.do_send(WsData(message.to_owned()));
             }
         }
     }
@@ -77,11 +112,27 @@ impl Handler<Connect> for WsServer {
         let id = self.rng.gen::<usize>();
         // define it as session id
         self.sessions.insert(id, msg.addr);
-        // insert id and table in the tables HashMap
-        self.tables
-            .entry(msg.table)
-            .or_insert_with(HashSet::new)
-            .insert(id);
+        // determine in which tables I have to insert
+        // insert id and table in the corresponding tables HashMap
+        let change_type = msg.watch_for.change_type;
+        if change_type == ChangeType::ALL || change_type == ChangeType::INSERT {
+            self.insert_tables
+                .entry(msg.watch_for.change_table.to_owned())
+                .or_insert_with(HashSet::new)
+                .insert(id);
+        }
+        if change_type == ChangeType::ALL || change_type == ChangeType::UPDATE {
+            self.update_tables
+                .entry(msg.watch_for.change_table.to_owned())
+                .or_insert_with(HashSet::new)
+                .insert(id);
+        }
+        if change_type == ChangeType::ALL || change_type == ChangeType::DELETE {
+            self.delete_tables
+                .entry(msg.watch_for.change_table)
+                .or_insert_with(HashSet::new)
+                .insert(id);
+        }
         // send id back
         id
     }
@@ -97,8 +148,21 @@ impl Handler<Disconnect> for WsServer {
         info!("WS: someone disconnected");
         if self.sessions.remove(&msg.id).is_some() {
             // remove session from all tables registered
-            for sessions in self.tables.values_mut() {
-                sessions.remove(&msg.id);
+            let change_type = msg.watch_for.change_type;
+            if change_type == ChangeType::ALL || change_type == ChangeType::INSERT {
+                for sessions in self.insert_tables.values_mut() {
+                    sessions.remove(&msg.id);
+                }
+            }
+            if change_type == ChangeType::ALL || change_type == ChangeType::UPDATE {
+                for sessions in self.update_tables.values_mut() {
+                    sessions.remove(&msg.id);
+                }
+            }
+            if change_type == ChangeType::ALL || change_type == ChangeType::DELETE {
+                for sessions in self.delete_tables.values_mut() {
+                    sessions.remove(&msg.id);
+                }
             }
         }
     }
@@ -109,6 +173,6 @@ impl Handler<ClientMessage> for WsServer {
     type Result = ();
 
     fn handle(&mut self, msg: ClientMessage, _: &mut Context<Self>) {
-        self.send_message(&msg.table, msg.msg.as_str());
+        self.send_message(&msg.change_table, msg.change_type, msg.msg.as_str());
     }
 }

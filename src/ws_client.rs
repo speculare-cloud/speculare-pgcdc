@@ -1,4 +1,5 @@
 use crate::ws_server;
+use crate::ws_utils::{str_to_change_type, ChangeType};
 
 use actix::prelude::*;
 use actix_web::{web, web::Path, Error, HttpRequest, HttpResponse};
@@ -10,15 +11,27 @@ const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 /// How long before lack of client response causes a timeout
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// Contains info for what does the Ws is listening to
+#[derive(Clone)]
+pub struct WsWatchFor {
+    pub change_table: String,
+    pub change_type: ChangeType,
+}
+
 /// Entry point for our websocket route
 pub async fn ws_index(
     req: HttpRequest,
     stream: web::Payload,
     srv: web::Data<Addr<ws_server::WsServer>>,
     tables: web::Data<Vec<String>>,
-    info: Path<String>,
+    params: Path<(String, String)>,
 ) -> Result<HttpResponse, Error> {
-    if !tables.contains(&info.0) {
+    if !tables.contains(&(params.0).0) {
+        error!("The TABLE the client asked for does not exists");
+        return Ok(HttpResponse::BadRequest().finish());
+    }
+    if !matches!((params.0).1.as_str(), "*" | "insert" | "update" | "delete") {
+        error!("The TYPE params does not match requirements.");
         return Ok(HttpResponse::BadRequest().finish());
     }
     ws::start(
@@ -26,7 +39,10 @@ pub async fn ws_index(
             id: 0,
             hb: Instant::now(),
             addr: srv.get_ref().clone(),
-            table: info.0,
+            watch_for: WsWatchFor {
+                change_table: (params.0).0,
+                change_type: str_to_change_type(&(params.0).1),
+            },
         },
         &req,
         stream,
@@ -41,7 +57,7 @@ struct WsSession {
     /// WsServer addr
     addr: Addr<ws_server::WsServer>,
     /// Table for which the Ws listen the changes
-    table: String,
+    watch_for: WsWatchFor,
 }
 
 impl Actor for WsSession {
@@ -54,7 +70,7 @@ impl Actor for WsSession {
         self.addr
             .send(ws_server::Connect {
                 addr: addr.recipient(),
-                table: self.table.to_owned(),
+                watch_for: self.watch_for.to_owned(),
             })
             .into_actor(self)
             .then(|res, act, ctx| {
@@ -68,7 +84,10 @@ impl Actor for WsSession {
     }
 
     fn stopping(&mut self, _: &mut Self::Context) -> Running {
-        self.addr.do_send(ws_server::Disconnect { id: self.id });
+        self.addr.do_send(ws_server::Disconnect {
+            id: self.id,
+            watch_for: self.watch_for.to_owned(),
+        });
         Running::Stop
     }
 }
@@ -117,7 +136,10 @@ impl WsSession {
                 // heartbeat timed out
                 error!("Websocket Client heartbeat failed, disconnecting!");
                 // notify WsServer to drop the current act.id
-                act.addr.do_send(ws_server::Disconnect { id: act.id });
+                act.addr.do_send(ws_server::Disconnect {
+                    id: act.id,
+                    watch_for: act.watch_for.to_owned(),
+                });
                 // stop actor
                 ctx.stop();
                 // don't send ping anymore

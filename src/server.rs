@@ -31,7 +31,10 @@ pub async fn server(
             .data(wsc.clone())
             .data(tables.clone())
             .route("/ping", actix_web::web::get().to(|| async { "pong" }))
-            .route("/ws/{table}", actix_web::web::get().to(ws_client::ws_index))
+            .route(
+                "/ws/{table}/{type}",
+                actix_web::web::get().to(ws_client::ws_index),
+            )
     });
     // Bind and run the server on HTTP or HTTPS depending on the mode of compilation.
     let binding = std::env::var("BINDING").expect("BINDING must be set");
