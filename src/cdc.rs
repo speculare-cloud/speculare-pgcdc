@@ -113,13 +113,16 @@ pub fn init_cdc_listener(mut rclient: ReplicationClient, tx: Sender<String>) {
                     // before cutting off the connection
                     // TODO - If sending too much keepalive, exit
                     if keepalive.reply() == 1 {
-                        warn!("sending keepalive reply with last_lsn == {}", last_lsn);
+                        info!("sending keepalive reply with last_lsn == {}", last_lsn);
                         let ts = epoch.elapsed().unwrap().as_micros() as i64;
-                        logical_stream
+                        match logical_stream
                             .as_mut()
                             .standby_status_update(last_lsn, last_lsn, last_lsn, ts, 0)
                             .await
-                            .unwrap();
+                        {
+                            Ok(_) => info!("keepalive sent"),
+                            Err(err) => error!("failed to deliver the keepalive due to: {}", err),
+                        }
                     }
                 }
                 Err(err) => error!("Replication stream error: {}", err),

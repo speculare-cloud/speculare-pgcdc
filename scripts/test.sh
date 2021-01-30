@@ -12,5 +12,7 @@ do
 	PGPASSWORD=password psql -U postgres -h 0.0.0.0 -d pgcdc -c "insert into test_table$y(name) values('$name');"
 	echo "Inserted $name"
 	x=$(( $x + 1 ))
-	sleep 3
+	sleep 1
+	PGPASSWORD=password psql -U postgres -h 0.0.0.0 -d pgcdc -c "update test_table$y set name='~~$name' where name='$name';"
+	sleep 1
 done

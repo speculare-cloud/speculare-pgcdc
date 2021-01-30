@@ -3,6 +3,7 @@ use crate::ws_server;
 use serde_json::Value;
 use tokio::sync::broadcast::Sender;
 
+/// Representation of SQL Change for CDC
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum ChangeType {
@@ -19,6 +20,7 @@ impl PartialEq for ChangeType {
     }
 }
 
+/// Convert str typed SQL change to ChangeType
 pub fn str_to_change_type(change_type: &str) -> ChangeType {
     match change_type {
         "insert" => ChangeType::INSERT,
@@ -37,25 +39,30 @@ pub fn init_ws_dispatcher(ws_server: actix::Addr<ws_server::WsServer>, tx: Sende
     tokio::spawn(async move {
         loop {
             let value = rx.recv().await;
-            match value {
-                Ok(val) => {
-                    trace!("Dispatcher task got: {}", val);
-                    let data: Value = serde_json::from_str(&val).unwrap();
-                    match data["change"][0]["table"].as_str() {
-                        Some(table_name) => match data["change"][0]["kind"].as_str() {
-                            Some(change_type) => {
-                                ws_server.do_send(ws_server::ClientMessage {
-                                    msg: val,
-                                    change_table: table_name.to_string(),
-                                    change_type: str_to_change_type(change_type),
-                                });
-                            }
-                            None => error!("Dispatcher don't know the type of the change"),
-                        },
-                        None => error!("Dispatcher don't know the targeted table"),
-                    };
-                }
-                Err(err) => error!("Task just got an error: {}", err),
+            if value.is_err() {
+                error!("Task just got an error: {}", value.err().unwrap());
+                continue;
+            }
+            let value = value.unwrap();
+            trace!("Dispatcher task got: {}", value);
+            let data: Value = serde_json::from_str(&value).unwrap();
+            if !data["change"].is_array() {
+                continue;
+            }
+            for change in data["change"].as_array().unwrap() {
+                match change["table"].as_str() {
+                    Some(table_name) => match change["kind"].as_str() {
+                        Some(change_type) => {
+                            ws_server.do_send(ws_server::ClientMessage {
+                                msg: change.to_string(),
+                                change_table: table_name.to_string(),
+                                change_type: str_to_change_type(change_type),
+                            });
+                        }
+                        None => error!("Dispatcher don't know the type of the change"),
+                    },
+                    None => error!("Dispatcher don't know the targeted table"),
+                };
             }
         }
     });
