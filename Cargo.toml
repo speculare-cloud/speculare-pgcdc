@@ -13,8 +13,9 @@ env_logger = "0.8"
 futures = "0.3"
 log = "0.4"
 openssl = "0.10"
-rand = "0.8"
 postgres-protocol = { git = "https://github.com/Martichou/rust-postgres", branch = "replication" }
+rand = "0.8"
+serde_json = "1.0"
 tokio-postgres = { git = "https://github.com/Martichou/rust-postgres", branch = "replication" }
 tokio = "1"
 

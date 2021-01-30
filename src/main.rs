@@ -43,22 +43,21 @@ async fn main() -> std::io::Result<()> {
         .into_iter()
         .filter_map(|msg| {
             if let SimpleQueryMessage::Row(row) = msg {
-                let schema = row.get(0).unwrap().to_string();
-                let table = row.get(1).unwrap().to_string();
-                Some((schema, table))
+                match row.get(0) {
+                    Some(val) => Some(val.to_owned()),
+                    _ => None,
+                }
             } else {
                 None
             }
         })
         .collect::<Vec<_>>();
 
-    dbg!(tables);
-
     // Init the replication slot and read the stream of change
     cdc::init_cdc_listener(rclient, tx);
 
     // Start the Actix server and so the websocket client
-    server::server(ws_server).await?;
+    server::server(ws_server, tables).await?;
 
     // Return Ok
     Ok(())

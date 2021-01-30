@@ -18,7 +18,10 @@ fn get_ssl_builder() -> openssl::ssl::SslAcceptorBuilder {
 }
 
 /// Construct and run the actix server instance.
-pub async fn server(wsc: actix::Addr<ws_server::WsServer>) -> std::io::Result<()> {
+pub async fn server(
+    wsc: actix::Addr<ws_server::WsServer>,
+    tables: Vec<String>,
+) -> std::io::Result<()> {
     // Construct the HttpServer instance.
     // Passing the pool of PgConnection and defining the logger / compress middleware.
     let serv = HttpServer::new(move || {
@@ -26,8 +29,9 @@ pub async fn server(wsc: actix::Addr<ws_server::WsServer>) -> std::io::Result<()
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::default())
             .data(wsc.clone())
+            .data(tables.clone())
             .route("/ping", actix_web::web::get().to(|| async { "pong" }))
-            .route("/ws", actix_web::web::get().to(ws_client::ws_index))
+            .route("/ws/{table}", actix_web::web::get().to(ws_client::ws_index))
     });
     // Bind and run the server on HTTP or HTTPS depending on the mode of compilation.
     let binding = std::env::var("BINDING").expect("BINDING must be set");

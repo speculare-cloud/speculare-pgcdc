@@ -1,7 +1,7 @@
 use crate::ws_server;
 
 use actix::prelude::*;
-use actix_web::{web, Error, HttpRequest, HttpResponse};
+use actix_web::{web, web::Path, Error, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
 use std::time::{Duration, Instant};
 
@@ -15,12 +15,18 @@ pub async fn ws_index(
     req: HttpRequest,
     stream: web::Payload,
     srv: web::Data<Addr<ws_server::WsServer>>,
+    tables: web::Data<Vec<String>>,
+    info: Path<String>,
 ) -> Result<HttpResponse, Error> {
+    if !tables.contains(&info.0) {
+        return Ok(HttpResponse::BadRequest().finish());
+    }
     ws::start(
         WsChatSession {
             id: 0,
             hb: Instant::now(),
             addr: srv.get_ref().clone(),
+            table: info.0,
         },
         &req,
         stream,
@@ -34,6 +40,8 @@ struct WsChatSession {
     hb: Instant,
     /// WsServer addr
     addr: Addr<ws_server::WsServer>,
+    /// Table for which the Ws listen the changes
+    table: String,
 }
 
 impl Actor for WsChatSession {
@@ -46,7 +54,7 @@ impl Actor for WsChatSession {
         self.addr
             .send(ws_server::Connect {
                 addr: addr.recipient(),
-                table: "test_table".to_owned(),
+                table: self.table.to_owned(),
             })
             .into_actor(self)
             .then(|res, act, ctx| {
