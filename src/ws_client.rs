@@ -2,8 +2,9 @@ use crate::ws_server;
 use crate::ws_utils::{str_to_change_type, ChangeType};
 
 use actix::prelude::*;
-use actix_web::{web, web::Path, Error, HttpRequest, HttpResponse};
+use actix_web::{web, web::Query, Error, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
+use serde::Deserialize;
 use std::time::{Duration, Instant};
 
 /// How often heartbeat pings are sent
@@ -18,30 +19,56 @@ pub struct WsWatchFor {
     pub change_type: ChangeType,
 }
 
+#[derive(Deserialize)]
+pub struct ListQueryParams {
+    pub change_table: Option<String>,
+    pub change_type: Option<String>,
+}
+
 /// Entry point for our websocket route
 pub async fn ws_index(
     req: HttpRequest,
     stream: web::Payload,
     srv: web::Data<Addr<ws_server::WsServer>>,
     tables: web::Data<Vec<String>>,
-    params: Path<(String, String)>,
+    params: Query<ListQueryParams>,
 ) -> Result<HttpResponse, Error> {
-    if !tables.contains(&(params.0).0) {
+    let change_table: &str;
+    let change_type: &str;
+    // If no params for the change_table, default to ALL
+    if params.change_table.is_none() {
+        change_table = "*";
+    } else {
+        change_table = &params.change_table.as_ref().unwrap();
+    }
+    // If no params for the change_type, default to ALL
+    if params.change_type.is_none() {
+        change_type = "*";
+    } else {
+        change_type = &params.change_type.as_ref().unwrap();
+    }
+    // Change_table as String owned by this scope
+    let change_table = change_table.to_owned();
+    // Check if table is * or tables contains the table we asked for
+    if change_table != "*" && !tables.contains(&change_table) {
         error!("The TABLE the client asked for does not exists");
         return Ok(HttpResponse::BadRequest().json("The TABLE asked for does not exists"));
     }
-    if !matches!((params.0).1.as_str(), "*" | "insert" | "update" | "delete") {
+    // Check if event type is * or one of the SQL changes type
+    if !matches!(change_type, "*" | "insert" | "update" | "delete") {
         error!("The TYPE params does not match requirements.");
         return Ok(HttpResponse::BadRequest().json("The TYPE params does not match requirements."));
     }
+    // Upgrade the HTTP connection to a WebSocket one
     ws::start(
+        // Construct the WebSocket session with srv addr and WsWatchFor
         WsSession {
             id: 0,
             hb: Instant::now(),
             addr: srv.get_ref().clone(),
             watch_for: WsWatchFor {
-                change_table: (params.0).0,
-                change_type: str_to_change_type(&(params.0).1),
+                change_table,
+                change_type: str_to_change_type(change_type),
             },
         },
         &req,
