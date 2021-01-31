@@ -28,11 +28,11 @@ pub async fn ws_index(
 ) -> Result<HttpResponse, Error> {
     if !tables.contains(&(params.0).0) {
         error!("The TABLE the client asked for does not exists");
-        return Ok(HttpResponse::BadRequest().finish());
+        return Ok(HttpResponse::BadRequest().json("The TABLE asked for does not exists"));
     }
     if !matches!((params.0).1.as_str(), "*" | "insert" | "update" | "delete") {
         error!("The TYPE params does not match requirements.");
-        return Ok(HttpResponse::BadRequest().finish());
+        return Ok(HttpResponse::BadRequest().json("The TYPE params does not match requirements."));
     }
     ws::start(
         WsSession {
