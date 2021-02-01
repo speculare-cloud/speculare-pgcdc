@@ -1,4 +1,4 @@
-use crate::ws_client::WsWatchFor;
+use crate::ws_client::{DataType, WsWatchFor};
 use crate::ws_utils::ChangeType;
 
 use actix::prelude::*;
@@ -29,7 +29,8 @@ impl Handler<Connect> for WsServer {
         // generate random usize id
         let id = self.rng.gen::<usize>();
         // define it as session id
-        self.sessions.insert(id, msg.addr);
+        self.sessions
+            .insert(id, (msg.watch_for.to_owned(), msg.addr));
         // determine in which tables I have to insert
         // insert id and table in the corresponding tables HashMap
         let change_type = msg.watch_for.change_type;
@@ -98,7 +99,7 @@ impl Handler<Disconnect> for WsServer {
 #[rtype(result = "()")]
 pub struct ClientMessage {
     /// Message
-    pub msg: String,
+    pub msg: serde_json::Value,
     /// Table name
     pub change_table: String,
     /// Change type
@@ -110,13 +111,13 @@ impl Handler<ClientMessage> for WsServer {
     type Result = ();
 
     fn handle(&mut self, msg: ClientMessage, _: &mut Context<Self>) {
-        self.send_message(&msg.change_table, msg.change_type, msg.msg.as_str());
+        self.send_message(&msg.change_table, msg.change_type, msg.msg);
     }
 }
 
 pub struct WsServer {
     /// Contains the id and the addr of the Ws reciever
-    sessions: HashMap<usize, Recipient<WsData>>,
+    sessions: HashMap<usize, (WsWatchFor, Recipient<WsData>)>,
     /// HashMap of who is listening which table, and name depend on the change type
     insert_tables: HashMap<String, HashSet<usize>>,
     update_tables: HashMap<String, HashSet<usize>>,
@@ -143,10 +144,16 @@ impl WsServer {
     }
 
     /// Send message to all websocket listening for table
-    fn send_message(&self, change_table: &str, change_type: ChangeType, message: &str) {
+    fn send_message(
+        &self,
+        change_table: &str,
+        change_type: ChangeType,
+        message: serde_json::Value,
+    ) {
         let sessions: Option<&HashSet<usize>>;
         match change_type {
             // Get all sessions for the table we're sending event
+            // TODO - Fix if table listened is "*"
             ChangeType::INSERT => {
                 sessions = self.insert_tables.get(change_table);
             }
@@ -168,9 +175,64 @@ impl WsServer {
         // For every sessions ID in the tables HashMap
         for id in sessions.unwrap() {
             // Get the Addr of the WS from the sessions hashmap by the id
-            if let Some(addr) = self.sessions.get(id) {
-                // Send the message
-                let _ = addr.do_send(WsData(message.to_owned()));
+            if let Some(info) = self.sessions.get(id) {
+                // Check if specific filter applies
+                if info.0.specific.is_some() {
+                    let specific = info.0.specific.as_ref().unwrap();
+                    let column = &specific.column;
+                    let value = &specific.value;
+                    // TODO - Implement OP (operation)
+                    //let op = &specific.op;
+
+                    let value_index: usize;
+                    if message["columnnames"].is_array() {
+                        let columns = message["columnnames"].as_array().unwrap();
+                        match (*columns)
+                            .iter()
+                            .position(|r| r == &serde_json::Value::String(column.to_owned()))
+                        {
+                            Some(index) => {
+                                value_index = index;
+                            }
+                            None => continue,
+                        }
+                        let mut to_send = false;
+                        if message["columnvalues"].is_array() {
+                            let values = message["columnvalues"].as_array().unwrap();
+                            let targeted_value = &values[value_index];
+                            match value {
+                                DataType::String(val) => {
+                                    if targeted_value.is_string() {
+                                        if targeted_value.as_str().unwrap() == val {
+                                            to_send = true;
+                                        } else {
+                                            continue;
+                                        }
+                                    } else {
+                                        continue;
+                                    }
+                                }
+                                DataType::Number(val) => {
+                                    if targeted_value.is_number() {
+                                        if targeted_value.as_i64().unwrap() == *val {
+                                            to_send = true;
+                                        } else {
+                                            continue;
+                                        }
+                                    } else {
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
+                        if to_send {
+                            let _ = info.1.do_send(WsData(message.to_string()));
+                        }
+                    }
+                } else {
+                    // Send the message
+                    let _ = info.1.do_send(WsData(message.to_string()));
+                }
             }
         }
     }

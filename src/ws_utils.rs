@@ -54,7 +54,7 @@ pub fn init_ws_dispatcher(ws_server: actix::Addr<ws_server::WsServer>, tx: Sende
                     Some(table_name) => match change["kind"].as_str() {
                         Some(change_type) => {
                             ws_server.do_send(ws_server::ClientMessage {
-                                msg: change.to_string(),
+                                msg: change.to_owned(),
                                 change_table: table_name.to_string(),
                                 change_type: str_to_change_type(change_type),
                             });

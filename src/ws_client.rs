@@ -114,8 +114,8 @@ pub async fn ws_index(
                 };
 
                 Some(SpecificFilter {
-                    column: column,
-                    value: value,
+                    column,
+                    value,
                     op,
                 })
             }
