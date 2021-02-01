@@ -12,17 +12,43 @@ const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 /// How long before lack of client response causes a timeout
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// List of supported data type
+#[derive(Clone)]
+pub enum DataType {
+    Number(i64),
+    String(String),
+}
+
+/// List of supported type
+#[derive(Clone)]
+pub enum Op {
+    Eq,
+    Lower,
+    Higher,
+}
+
+/// Contains the specific filter applied to the Ws
+#[derive(Clone)]
+pub struct SpecificFilter {
+    pub column: String,
+    pub value: DataType,
+    pub op: Op,
+}
+
 /// Contains info for what does the Ws is listening to
 #[derive(Clone)]
 pub struct WsWatchFor {
     pub change_table: String,
     pub change_type: ChangeType,
+    pub specific: Option<SpecificFilter>,
 }
 
+/// Contains info for which table/event/filter we're listening
 #[derive(Deserialize)]
 pub struct ListQueryParams {
     pub change_table: Option<String>,
     pub change_type: Option<String>,
+    pub specific_filter: Option<String>,
 }
 
 /// Entry point for our websocket route
@@ -59,6 +85,44 @@ pub async fn ws_index(
         error!("The TYPE params does not match requirements.");
         return Ok(HttpResponse::BadRequest().json("The TYPE params does not match requirements."));
     }
+
+    // Parse the SpecificFilter <col>.<op>.<val>
+    let specific: Option<SpecificFilter> = match &params.specific_filter {
+        Some(filter) => {
+            let parts: Vec<&str> = filter.split('.').collect();
+            if parts.len() != 3 {
+                error!("The FILTER params does not match requirements.");
+                return Ok(HttpResponse::BadRequest()
+                    .json("The FILTER params does not match requirements."));
+            } else {
+                let op = match parts[1] {
+                    "eq" => Op::Eq,
+                    "pl" => Op::Higher,
+                    "lw" => Op::Lower,
+                    _ => {
+                        error!("The OP params does not match requirements.");
+                        return Ok(HttpResponse::BadRequest()
+                            .json("The OP params does not match requirements."));
+                    }
+                };
+
+                let column = parts[0].to_owned();
+
+                let value = match parts[2].parse::<i64>() {
+                    Ok(nbr) => DataType::Number(nbr),
+                    Err(_) => DataType::String(parts[2].to_owned()),
+                };
+
+                Some(SpecificFilter {
+                    column: column,
+                    value: value,
+                    op,
+                })
+            }
+        }
+        None => None,
+    };
+
     // Upgrade the HTTP connection to a WebSocket one
     ws::start(
         // Construct the WebSocket session with srv addr and WsWatchFor
@@ -69,6 +133,7 @@ pub async fn ws_index(
             watch_for: WsWatchFor {
                 change_table,
                 change_type: str_to_change_type(change_type),
+                specific,
             },
         },
         &req,
