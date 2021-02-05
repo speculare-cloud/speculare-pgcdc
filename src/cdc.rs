@@ -87,7 +87,7 @@ pub fn init_cdc_listener(mut rclient: ReplicationClient, tx: Sender<String>) {
             .unwrap();
 
         // Listen for the replication stream
-        let mut keepalive_sent_count = 0;
+        let mut keepalive_sent_count: u8 = 0;
         while let Some(replication_message) = logical_stream.next().await {
             match replication_message {
                 Ok(ReplicationMessage::XLogData(xlog_data)) => {
@@ -101,7 +101,8 @@ pub fn init_cdc_listener(mut rclient: ReplicationClient, tx: Sender<String>) {
                     // that if tx.send() fail, we panic! because our program is fucked up at this point
                     // TODO - If this fail, create a new Receiver by calling tx.subscribe in the appropriate task.
                     if let Err(err) = tx.send(json.to_owned()) {
-                        panic!(err)
+						error!("Fatal error, can't send to the channel: {}", err);
+						std::process::exit(1);
                     }
                     trace!("Json sent");
 
