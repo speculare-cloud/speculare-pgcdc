@@ -177,6 +177,7 @@ impl WsServer {
             // Get the Addr of the WS from the sessions hashmap by the id
             if let Some(info) = self.sessions.get(id) {
                 // Check if specific filter applies
+                // TODO - Document
                 if info.0.specific.is_some() {
                     let specific = info.0.specific.as_ref().unwrap();
                     let column = &specific.column;

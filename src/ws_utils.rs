@@ -38,6 +38,7 @@ pub fn init_ws_dispatcher(ws_server: actix::Addr<ws_server::WsServer>, tx: Sende
     // Spawn the task handling the rest
     tokio::spawn(async move {
         loop {
+            // TODO - Document
             let value = rx.recv().await;
             if value.is_err() {
                 error!("Task just got an error: {}", value.err().unwrap());

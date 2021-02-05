@@ -12,6 +12,7 @@ const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 /// How long before lack of client response causes a timeout
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 
+// TODO - Handle more Type
 /// List of supported data type
 #[derive(Clone)]
 pub enum DataType {
@@ -19,6 +20,7 @@ pub enum DataType {
     String(String),
 }
 
+// TODO - Handle more OP
 /// List of supported type
 #[derive(Clone)]
 pub enum Op {
@@ -51,6 +53,7 @@ pub struct ListQueryParams {
     pub specific_filter: Option<String>,
 }
 
+// TODO - Split and optimize
 /// Entry point for our websocket route
 pub async fn ws_index(
     req: HttpRequest,
@@ -87,6 +90,7 @@ pub async fn ws_index(
     }
 
     // Parse the SpecificFilter <col>.<op>.<val>
+    // TODO - Document
     let specific: Option<SpecificFilter> = match &params.specific_filter {
         Some(filter) => {
             let parts: Vec<&str> = filter.split('.').collect();
@@ -113,11 +117,7 @@ pub async fn ws_index(
                     Err(_) => DataType::String(parts[2].to_owned()),
                 };
 
-                Some(SpecificFilter {
-                    column,
-                    value,
-                    op,
-                })
+                Some(SpecificFilter { column, value, op })
             }
         }
         None => None,
@@ -157,7 +157,7 @@ impl Actor for WsSession {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         self.hb(ctx);
-
+        // TODO - Document
         let addr = ctx.address();
         self.addr
             .send(ws_server::Connect {
@@ -175,6 +175,7 @@ impl Actor for WsSession {
             .wait(ctx);
     }
 
+    // TODO - Document
     fn stopping(&mut self, _: &mut Self::Context) -> Running {
         self.addr.do_send(ws_server::Disconnect {
             id: self.id,
