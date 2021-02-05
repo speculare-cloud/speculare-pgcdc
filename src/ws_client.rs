@@ -48,7 +48,7 @@ pub struct WsWatchFor {
 /// Contains info for which table/event/filter we're listening
 #[derive(Deserialize)]
 pub struct ListQueryParams {
-    pub change_table: Option<String>,
+    pub change_table: String,
     pub change_type: Option<String>,
     pub specific_filter: Option<String>,
 }
@@ -62,14 +62,7 @@ pub async fn ws_index(
     tables: web::Data<Vec<String>>,
     params: Query<ListQueryParams>,
 ) -> Result<HttpResponse, Error> {
-    let change_table: &str;
     let change_type: &str;
-    // If no params for the change_table, default to ALL
-    if params.change_table.is_none() {
-        change_table = "*";
-    } else {
-        change_table = &params.change_table.as_ref().unwrap();
-    }
     // If no params for the change_type, default to ALL
     if params.change_type.is_none() {
         change_type = "*";
@@ -77,9 +70,9 @@ pub async fn ws_index(
         change_type = &params.change_type.as_ref().unwrap();
     }
     // Change_table as String owned by this scope
-    let change_table = change_table.to_owned();
+    let change_table = params.change_table.to_owned();
     // Check if table is * or tables contains the table we asked for
-    if change_table != "*" && !tables.contains(&change_table) {
+    if !tables.contains(&change_table) {
         error!("The TABLE the client asked for does not exists");
         return Ok(HttpResponse::BadRequest().json("The TABLE asked for does not exists"));
     }
