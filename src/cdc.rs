@@ -87,6 +87,7 @@ pub fn init_cdc_listener(mut rclient: ReplicationClient, tx: Sender<String>) {
             .unwrap();
 
         // Listen for the replication stream
+        let mut keepalive_sent_count = 0;
         while let Some(replication_message) = logical_stream.next().await {
             match replication_message {
                 Ok(ReplicationMessage::XLogData(xlog_data)) => {
@@ -111,8 +112,15 @@ pub fn init_cdc_listener(mut rclient: ReplicationClient, tx: Sender<String>) {
                 Ok(ReplicationMessage::PrimaryKeepAlive(keepalive)) => {
                     // If the keepalive reply is 1, this means postgres is waiting for our reply
                     // before cutting off the connection
-                    // TODO - If sending too much keepalive, exit
                     if keepalive.reply() == 1 {
+                        keepalive_sent_count += 1;
+                        if keepalive_sent_count > 5 {
+                            error!(
+                                "Fatal error, too much keepalive == 1: {}",
+                                keepalive_sent_count
+                            );
+                            std::process::exit(1);
+                        }
                         info!("sending keepalive reply with last_lsn == {}", last_lsn);
                         let ts = epoch.elapsed().unwrap().as_micros() as i64;
                         match logical_stream
@@ -123,6 +131,8 @@ pub fn init_cdc_listener(mut rclient: ReplicationClient, tx: Sender<String>) {
                             Ok(_) => info!("keepalive sent"),
                             Err(err) => error!("failed to deliver the keepalive due to: {}", err),
                         }
+                    } else {
+                        keepalive_sent_count = 0;
                     }
                 }
                 Err(err) => error!("Replication stream error: {}", err),
