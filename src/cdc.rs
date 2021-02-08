@@ -86,8 +86,12 @@ pub fn init_cdc_listener(mut rclient: ReplicationClient, tx: Sender<String>) {
             .await
             .unwrap();
 
-        // Listen for the replication stream
+        // Keepalive sent count before a successfull keepalive
+        // A successfull keepalive is when Postgres ask us for a reply of 1
+        // we send it and after that we recieve a reply of 0.
+        // This mean we successfully sent our keepalive packet.
         let mut keepalive_sent_count: u8 = 0;
+        // Listen for the replication stream
         while let Some(replication_message) = logical_stream.next().await {
             match replication_message {
                 Ok(ReplicationMessage::XLogData(xlog_data)) => {
@@ -114,7 +118,10 @@ pub fn init_cdc_listener(mut rclient: ReplicationClient, tx: Sender<String>) {
                     // If the keepalive reply is 1, this means postgres is waiting for our reply
                     // before cutting off the connection
                     if keepalive.reply() == 1 {
+                        // Increment the keepalive count
                         keepalive_sent_count += 1;
+                        // If more than 5 keepalive were sent before one success
+                        // we just exit and crash because we're prolly spamming the CPU and the network.
                         if keepalive_sent_count > 5 {
                             error!(
                                 "Fatal error, too much keepalive == 1: {}",
@@ -122,8 +129,10 @@ pub fn init_cdc_listener(mut rclient: ReplicationClient, tx: Sender<String>) {
                             );
                             std::process::exit(1);
                         }
+                        // Calculating the epoch for the packet 
                         info!("sending keepalive reply with last_lsn == {}", last_lsn);
                         let ts = epoch.elapsed().unwrap().as_micros() as i64;
+                        // Send the keepalive with the last lsn we got
                         match logical_stream
                             .as_mut()
                             .standby_status_update(last_lsn, last_lsn, last_lsn, ts, 0)
@@ -132,7 +141,8 @@ pub fn init_cdc_listener(mut rclient: ReplicationClient, tx: Sender<String>) {
                             Ok(_) => info!("keepalive sent"),
                             Err(err) => error!("failed to deliver the keepalive due to: {}", err),
                         }
-                    } else {
+                    } else if keepalive_sent_count != 0 {
+                        // Reset the counter because if we got a reply of 0 it's all good
                         keepalive_sent_count = 0;
                     }
                 }

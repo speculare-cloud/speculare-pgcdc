@@ -35,6 +35,7 @@ async fn main() -> std::io::Result<()> {
     ws_utils::init_ws_dispatcher(ws_server.clone(), tx.clone());
 
     // Get all tables contained in the Database
+    // TODO - Add an auto refresh for new table every REFRESH_TABLES minutes
     let query = "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';";
     let tables = rclient
         .simple_query(&query)

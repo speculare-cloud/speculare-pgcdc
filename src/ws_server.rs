@@ -169,6 +169,7 @@ impl WsServer {
                 return;
             }
         }
+        // If no session were defined, skip
         if sessions.is_none() {
             return;
         }
@@ -177,16 +178,17 @@ impl WsServer {
             // Get the Addr of the WS from the sessions hashmap by the id
             if let Some(info) = self.sessions.get(id) {
                 // Check if specific filter applies
-                // TODO - Document
                 if info.0.specific.is_some() {
                     let specific = info.0.specific.as_ref().unwrap();
                     let column = &specific.column;
                     let value = &specific.value;
+                    
                     // TODO - Implement OP (operation)
                     //let op = &specific.op;
 
-                    let value_index: usize;
                     if message["columnnames"].is_array() {
+                        let value_index: usize;
+                        // Determine if the column is present in this change
                         let columns = message["columnnames"].as_array().unwrap();
                         match (*columns)
                             .iter()
@@ -198,6 +200,8 @@ impl WsServer {
                             None => continue,
                         }
                         let mut to_send = false;
+                        // This part is to optimize and rewrite, but basically it just
+                        // match, filter and sort around the criteria of the column value.
                         if message["columnvalues"].is_array() {
                             let values = message["columnvalues"].as_array().unwrap();
                             let targeted_value = &values[value_index];

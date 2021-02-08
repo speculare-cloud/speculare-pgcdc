@@ -83,15 +83,20 @@ pub async fn ws_index(
     }
 
     // Parse the SpecificFilter <col>.<op>.<val>
-    // TODO - Document
     let specific: Option<SpecificFilter> = match &params.specific_filter {
         Some(filter) => {
+            // Split the filter by '.'
+            // col  = [0]
+            // op   = [1]
+            // val  = [2]
             let parts: Vec<&str> = filter.split('.').collect();
             if parts.len() != 3 {
                 error!("The FILTER params does not match requirements.");
                 return Ok(HttpResponse::BadRequest()
                     .json("The FILTER params does not match requirements."));
             } else {
+                // As we only handle a small number of OP, 
+                // determine which one we're asking for, and if not found, return 400
                 let op = match parts[1] {
                     "eq" => Op::Eq,
                     "pl" => Op::Higher,
@@ -102,14 +107,16 @@ pub async fn ws_index(
                             .json("The OP params does not match requirements."));
                     }
                 };
-
+                // Convert the column str to a owned String for latter use
                 let column = parts[0].to_owned();
 
+                // Convert the number if it's a number, else create a String from the str
                 let value = match parts[2].parse::<i64>() {
                     Ok(nbr) => DataType::Number(nbr),
                     Err(_) => DataType::String(parts[2].to_owned()),
                 };
 
+                // Return the SpecificFilter object (struct)
                 Some(SpecificFilter { column, value, op })
             }
         }
@@ -149,15 +156,19 @@ impl Actor for WsSession {
     type Context = ws::WebsocketContext<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
+        // Start the heartbeat for this session
         self.hb(ctx);
-        // TODO - Document
+        // Get the addr of this session Context
         let addr = ctx.address();
+        // Send the info a new connection has been opened to the server
         self.addr
             .send(ws_server::Connect {
                 addr: addr.recipient(),
                 watch_for: self.watch_for.to_owned(),
             })
             .into_actor(self)
+            // Update the session id by the one the server gave us
+            // else we crash this session
             .then(|res, act, ctx| {
                 match res {
                     Ok(res) => act.id = res,
@@ -168,8 +179,8 @@ impl Actor for WsSession {
             .wait(ctx);
     }
 
-    // TODO - Document
     fn stopping(&mut self, _: &mut Self::Context) -> Running {
+        // Just send a disconnect message to the server
         self.addr.do_send(ws_server::Disconnect {
             id: self.id,
             watch_for: self.watch_for.to_owned(),
