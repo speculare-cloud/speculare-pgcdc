@@ -1,5 +1,4 @@
-use crate::ws_client;
-use crate::ws_server;
+use crate::websockets::{ws_index::ws_index, ws_server::WsServer};
 
 use actix_web::{middleware, App, HttpServer};
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
@@ -18,10 +17,7 @@ fn get_ssl_builder() -> openssl::ssl::SslAcceptorBuilder {
 }
 
 /// Construct and run the actix server instance.
-pub async fn server(
-    wsc: actix::Addr<ws_server::WsServer>,
-    tables: Vec<String>,
-) -> std::io::Result<()> {
+pub async fn server(wsc: actix::Addr<WsServer>, tables: Vec<String>) -> std::io::Result<()> {
     // Construct the HttpServer instance.
     // Passing the pool of PgConnection and defining the logger / compress middleware.
     let serv = HttpServer::new(move || {
@@ -31,7 +27,7 @@ pub async fn server(
             .data(wsc.clone())
             .data(tables.clone())
             .route("/ping", actix_web::web::get().to(|| async { "pong" }))
-            .route("/ws", actix_web::web::get().to(ws_client::ws_index))
+            .route("/ws", actix_web::web::get().to(ws_index))
     });
     // Bind and run the server on HTTP or HTTPS depending on the mode of compilation.
     let binding = std::env::var("BINDING").expect("BINDING must be set");

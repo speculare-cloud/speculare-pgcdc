@@ -1,24 +1,8 @@
-use crate::ws_server;
+use super::ws_server;
+use super::ChangeType;
 
 use serde_json::Value;
 use tokio::sync::broadcast::Sender;
-
-/// Representation of SQL Change for CDC
-#[derive(Debug, Clone, Copy)]
-#[repr(u8)]
-pub enum ChangeType {
-    INSERT = 0,
-    UPDATE = 1,
-    DELETE = 2,
-    UNKNOWN = 3,
-    ALL = 4,
-}
-
-impl PartialEq for ChangeType {
-    fn eq(&self, other: &ChangeType) -> bool {
-        *self as u8 == *other as u8
-    }
-}
 
 /// Convert str typed SQL change to ChangeType
 pub fn str_to_change_type(change_type: &str) -> ChangeType {

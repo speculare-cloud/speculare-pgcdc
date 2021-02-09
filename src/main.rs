@@ -8,9 +8,10 @@ use tokio_postgres::SimpleQueryMessage;
 mod cdc;
 mod logger;
 mod server;
-mod ws_client;
-mod ws_server;
-mod ws_utils;
+mod websockets;
+
+use websockets::ws_dispatcher;
+use websockets::ws_server::WsServer;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -28,11 +29,11 @@ async fn main() -> std::io::Result<()> {
     let (tx, _) = broadcast::channel(16);
 
     // Start WsServer actor
-    let ws_server = ws_server::WsServer::new().start();
+    let ws_server = WsServer::new().start();
 
     // Clone the Sender of the broadcast to allow it to be used in two async context
     // Init the ws_dispatcher before init_cdc_listener because the latter will fail if no subscriber are waiting
-    ws_utils::init_ws_dispatcher(ws_server.clone(), tx.clone());
+    ws_dispatcher::init_ws_dispatcher(ws_server.clone(), tx.clone());
 
     // Get all tables contained in the Database
     // TODO - Add an auto refresh for new table every REFRESH_TABLES minutes
