@@ -1,4 +1,4 @@
-use crate::ws_client::{DataType, WsWatchFor};
+use crate::ws_client::WsWatchFor;
 use crate::ws_utils::ChangeType;
 
 use actix::prelude::*;
@@ -153,7 +153,7 @@ impl WsServer {
         let sessions: Option<&HashSet<usize>>;
         match change_type {
             // Get all sessions for the table we're sending event
-            // TODO - Fix if table listened is "*"
+            // TODO - Implement listening for all table
             ChangeType::INSERT => {
                 sessions = self.insert_tables.get(change_table);
             }
@@ -178,64 +178,17 @@ impl WsServer {
             // Get the Addr of the WS from the sessions hashmap by the id
             if let Some(info) = self.sessions.get(id) {
                 // Check if specific filter applies
-                if info.0.specific.is_some() {
-                    let specific = info.0.specific.as_ref().unwrap();
-                    let column = &specific.column;
-                    let value = &specific.value;
-                    
-                    // TODO - Implement OP (operation)
-                    //let op = &specific.op;
-
-                    if message["columnnames"].is_array() {
-                        let value_index: usize;
-                        // Determine if the column is present in this change
-                        let columns = message["columnnames"].as_array().unwrap();
-                        match (*columns)
-                            .iter()
-                            .position(|r| r == &serde_json::Value::String(column.to_owned()))
-                        {
-                            Some(index) => {
-                                value_index = index;
-                            }
-                            None => continue,
-                        }
-                        let mut to_send = false;
-                        // This part is to optimize and rewrite, but basically it just
-                        // match, filter and sort around the criteria of the column value.
-                        if message["columnvalues"].is_array() {
-                            let values = message["columnvalues"].as_array().unwrap();
-                            let targeted_value = &values[value_index];
-                            match value {
-                                DataType::String(val) => {
-                                    if targeted_value.is_string() {
-                                        if targeted_value.as_str().unwrap() == val {
-                                            to_send = true;
-                                        } else {
-                                            continue;
-                                        }
-                                    } else {
-                                        continue;
-                                    }
-                                }
-                                DataType::Number(val) => {
-                                    if targeted_value.is_number() {
-                                        if targeted_value.as_i64().unwrap() == *val {
-                                            to_send = true;
-                                        } else {
-                                            continue;
-                                        }
-                                    } else {
-                                        continue;
-                                    }
-                                }
-                            }
-                        }
-                        if to_send {
-                            let _ = info.1.do_send(WsData(message.to_string()));
-                        }
-                    }
+                let to_send = if info.0.specific.is_none() {
+                    true
                 } else {
-                    // Send the message
+                    info.0
+                        .specific
+                        .as_ref()
+                        .unwrap()
+                        .match_specific_filter(&message)
+                };
+                // If we need to send the info, just send it
+                if to_send {
                     let _ = info.1.do_send(WsData(message.to_string()));
                 }
             }

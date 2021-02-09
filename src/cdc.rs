@@ -129,7 +129,7 @@ pub fn init_cdc_listener(mut rclient: ReplicationClient, tx: Sender<String>) {
                             );
                             std::process::exit(1);
                         }
-                        // Calculating the epoch for the packet 
+                        // Calculating the epoch for the packet
                         info!("sending keepalive reply with last_lsn == {}", last_lsn);
                         let ts = epoch.elapsed().unwrap().as_micros() as i64;
                         // Send the keepalive with the last lsn we got
