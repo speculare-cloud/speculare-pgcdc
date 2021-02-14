@@ -14,12 +14,10 @@ futures = "0.3"
 log = "0.4"
 openssl = "0.10"
 postgres-protocol = { git = "https://github.com/Martichou/rust-postgres", branch = "replication" }
-# postgres-protocol = { path = "../rust-postgres/postgres-protocol" }
 rand = "0.8"
 serde = "1.0"
 serde_json = "1.0"
 tokio-postgres = { git = "https://github.com/Martichou/rust-postgres", branch = "replication" }
-# tokio-postgres = { path = "../rust-postgres/tokio-postgres" }
 tokio = "1"
 
 [dependencies.actix-web]
