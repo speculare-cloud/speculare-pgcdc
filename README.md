@@ -29,7 +29,12 @@ As it's used with Speculare, in order to prevent anyone to access your data stre
 Server setup / Dev setup
 --------------------------
 
-(for now, it's impossible for you to use this project as I'm using custom version of Actix and Rust-postgres crate, but once they get stabilized I'll switch to the released version)
+- Install all deps
+```bash
+$ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+# postgresql-12 is optional
+$ sudo apt-get install libpq-dev pkg-config
+```
 
 There pretty much only one step in this setup (other than Docker (see below))
 
