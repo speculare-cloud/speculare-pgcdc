@@ -26,7 +26,7 @@ pub async fn server(wsc: actix::Addr<WsServer>, tables: Vec<String>) -> std::io:
             .wrap(middleware::Logger::default())
             .data(wsc.clone())
             .data(tables.clone())
-            .route("/ping", actix_web::web::get().to(|| async { "pong" }))
+            .route("/ping", actix_web::web::get().to(|| async { "zpour" }))
             .route("/ws", actix_web::web::get().to(ws_index))
     });
     // Bind and run the server on HTTP or HTTPS depending on the mode of compilation.
