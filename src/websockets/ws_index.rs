@@ -20,9 +20,9 @@ pub struct ListQueryParams {
 
 /// Entry point for our websocket route
 ///
-/// Use this route like /ws?change_tables=table1,table2&change_type=insert&spf=id.eq.12
+/// Use this route like /ws?change_table=table1&change_type=insert&spf=id.eq.12
 ///
-/// The above route will get insert type change from tables1 and table2 where id is equals to 12.
+/// The above route will get insert type change from tables1 where id is equals to 12.
 pub async fn ws_index(
     req: HttpRequest,
     stream: web::Payload,

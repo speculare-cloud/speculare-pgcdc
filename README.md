@@ -22,7 +22,7 @@ As you probably know, Postgresql is not a realtime databse. So if we want to str
 
 Hopefully Postgresql have that sweet feature named `Logical Replication`, which stream the change made into the database over a replication slot. We can use a multitude of plugin to format the output of this stream, but for Speculare-PGCDC I've chosen to use wal2json.
 
-This project "simply" create a replication slot on the targeted postgres instance (if it's supported) and then stream the change from this slot to all the websockets connected. It even offer you some benefit such as only getting change from one table, or for one type of event `INSERT, UPDATE, DELETE` or even by querying like you would do with a `WHERE` clause in SQL.
+This project "simply" create a replication slot on the targeted postgres instance (if it's supported) and then stream the change from this slot to all the websockets connected. It offer you some benefit such as only getting change from one table, or for one type of event `INSERT, UPDATE, DELETE` or even by filtering results like you would do with a `WHERE` clause in SQL (simpler, only one WHERE clause).
 
 Server setup / Dev setup
 --------------------------
@@ -36,6 +36,19 @@ $ sudo apt-get install libssl-dev libpq-dev pkg-config build-essential
 There pretty much only one step in this setup (other than Docker (see below))
 
 - Create a .env file based on .env.example
+
+Usage
+--------------------------
+
+```
+$ curl url:port/ws?change_table=table1&change_type=insert&spf=id.eq.12
+
+_will get INSERT change from tables1 where id is equals to 12_
+```
+
+The `change_table` and `change_type` parameters are mandatory, if you're missing them you'll get a 400 error.
+
+I decided to restrict the API in such way that a single websocket can only listen to one table and to one change_type. This might change in the future if needed, but as of now and in the current shape of Speculare, it's not needed.
 
 Setup Docker
 --------------------------
