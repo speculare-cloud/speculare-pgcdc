@@ -32,6 +32,7 @@ impl SpecificFilter {
         let column = &filter.column;
         let value = &filter.value;
         // TODO - Implement OP (operation)
+        // - Default to Eq
         //let op = &specific.op;
 
         if message["columnnames"].is_array() {

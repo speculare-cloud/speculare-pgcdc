@@ -1,4 +1,4 @@
-use crate::websockets::{ws_index::ws_index, ws_server::WsServer};
+use crate::websockets::{server::ws_server::WsServer, ws_index::ws_index};
 
 use actix_web::{middleware, App, HttpServer};
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};

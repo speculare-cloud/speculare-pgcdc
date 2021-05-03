@@ -1,4 +1,4 @@
-use super::ws_server;
+use super::server::{handler_connect, handler_disconnect, ws_server};
 use super::WsWatchFor;
 
 use actix::prelude::*;
@@ -31,13 +31,12 @@ impl Actor for WsSession {
         let addr = ctx.address();
         // Send the info a new connection has been opened to the server
         self.addr
-            .send(ws_server::Connect {
+            .send(handler_connect::Connect {
                 addr: addr.recipient(),
                 watch_for: self.watch_for.to_owned(),
             })
             .into_actor(self)
-            // Update the session id by the one the server gave us
-            // else we crash this session
+            // Update the session id by the one the server gave us else we crash this session
             .then(|res, act, ctx| {
                 match res {
                     Ok(res) => act.id = res,
@@ -50,9 +49,9 @@ impl Actor for WsSession {
 
     fn stopping(&mut self, _: &mut Self::Context) -> Running {
         // Just send a disconnect message to the server
-        self.addr.do_send(ws_server::Disconnect {
+        self.addr.do_send(handler_disconnect::Disconnect {
             id: self.id,
-            watch_for: self.watch_for.to_owned(),
+            change_type: self.watch_for.change_type,
         });
         Running::Stop
     }
@@ -85,8 +84,6 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
             Ok(ws::Message::Continuation(_)) => {
                 ctx.stop();
             }
-            // TODO - Handle message from the client
-            // we might want to give him the ability to update his listening table on the fly
             Err(_) => ctx.stop(),
             _ => (),
         }
@@ -104,9 +101,9 @@ impl WsSession {
                 // heartbeat timed out
                 error!("Websocket Client heartbeat failed, disconnecting!");
                 // notify WsServer to drop the current act.id
-                act.addr.do_send(ws_server::Disconnect {
+                act.addr.do_send(handler_disconnect::Disconnect {
                     id: act.id,
-                    watch_for: act.watch_for.to_owned(),
+                    change_type: act.watch_for.change_type,
                 });
                 // stop actor
                 ctx.stop();

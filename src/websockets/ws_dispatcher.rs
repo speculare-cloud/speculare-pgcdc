@@ -1,19 +1,7 @@
-use super::ws_server;
-use super::ChangeType;
+use super::server::{handler_message, ws_server};
 
 use serde_json::Value;
 use tokio::sync::broadcast::Sender;
-
-/// Convert str typed SQL change to ChangeType
-pub fn str_to_change_type(change_type: &str) -> ChangeType {
-    match change_type {
-        "insert" => ChangeType::INSERT,
-        "update" => ChangeType::UPDATE,
-        "delete" => ChangeType::DELETE,
-        "*" => ChangeType::ALL,
-        _ => ChangeType::UNKNOWN,
-    }
-}
 
 /// Start a new task which loop over the broadcast's value it may send and dispatch them to websocket.
 pub fn init_ws_dispatcher(ws_server: actix::Addr<ws_server::WsServer>, tx: Sender<String>) {
@@ -46,10 +34,10 @@ pub fn init_ws_dispatcher(ws_server: actix::Addr<ws_server::WsServer>, tx: Sende
                         Some(change_type) => {
                             // We just send the info to the ws_server which will then broadcast
                             // the change to all the websocket listening for it
-                            ws_server.do_send(ws_server::ClientMessage {
+                            ws_server.do_send(handler_message::ClientMessage {
                                 msg: change.to_owned(),
                                 change_table: table_name.to_string(),
-                                change_type: str_to_change_type(change_type),
+                                change_type: super::str_to_change_type(change_type),
                             });
                         }
                         None => error!("Dispatcher don't know the type of the change"),

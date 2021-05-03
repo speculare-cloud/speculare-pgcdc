@@ -24,8 +24,6 @@ Hopefully Postgresql have that sweet feature named `Logical Replication`, which 
 
 This project "simply" create a replication slot on the targeted postgres instance (if it's supported) and then stream the change from this slot to all the websockets connected. It even offer you some benefit such as only getting change from one table, or for one type of event `INSERT, UPDATE, DELETE` or even by querying like you would do with a `WHERE` clause in SQL.
 
-As it's used with Speculare, in order to prevent anyone to access your data stream, this service is protected behind an authentification provided by Speculare-Server through Redis (Redis store the session which are shared). So you can't use Speculare-PGCDC without Speculare-Server for now. However I'm planning to create a special version of this service without the Auth system to allow everyone to use it.
-
 Server setup / Dev setup
 --------------------------
 

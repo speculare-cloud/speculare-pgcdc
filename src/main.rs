@@ -10,8 +10,8 @@ mod logger;
 mod server;
 mod websockets;
 
+use websockets::server::ws_server::WsServer;
 use websockets::ws_dispatcher;
-use websockets::ws_server::WsServer;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -36,7 +36,6 @@ async fn main() -> std::io::Result<()> {
     ws_dispatcher::init_ws_dispatcher(ws_server.clone(), tx.clone());
 
     // Get all tables contained in the Database
-    // TODO - Add an auto refresh for new table every REFRESH_TABLES minutes
     let query = "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';";
     let tables = rclient
         .simple_query(&query)
