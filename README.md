@@ -6,6 +6,7 @@
   <p>
 
 [![Apache 2 License](https://img.shields.io/badge/license-Apache%202-blue.svg)](LICENSE)
+[![CI](https://github.com/speculare-cloud/speculare-pgcdc/workflows/CI/badge.svg)](https://github.com/speculare-cloud/speculare-pgcdc/actions)
 
   </p>
 </div>
