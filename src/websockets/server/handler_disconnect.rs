@@ -20,13 +20,16 @@ impl Handler<Disconnect> for WsServer {
 
     fn handle(&mut self, event: Disconnect, _: &mut Context<Self>) {
         info!("WS: someone disconnected");
+        // Check if the event.id is still in the sessions list
         if self.sessions.remove(&event.id).is_some() {
             // Remove session from all tables registered
             // Dumb var to get less verbose code in the following IFs
             let ct = event.change_type;
-            // Insert in the right category depending on the type
+            // Delete in the right category depending on the type
             if ct == ChangeType::AllTypes || ct == ChangeType::Insert {
+                // For each table entries, remove the id of the ws_session
                 for list_sessions in self.insert_tables.values_mut() {
+                    // Even if the event.id is not in the list_sessions, it will try
                     list_sessions.remove(&event.id);
                 }
             }

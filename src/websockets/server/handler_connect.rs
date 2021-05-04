@@ -6,7 +6,7 @@ use actix::prelude::*;
 use rand::{self, Rng};
 use std::collections::HashSet;
 
-/// New session is created
+/// Data used when a new session is created
 #[derive(Message)]
 #[rtype(usize)]
 pub struct Connect {
@@ -24,7 +24,7 @@ impl Handler<Connect> for WsServer {
         info!("WS: new connection");
         // Generate random usize id
         let id = self.rng.gen::<usize>();
-        // Define it as session id
+        // Insert the id into the list of sessions and construct SessionInfo
         self.sessions.insert(
             id,
             SessionInfo {
@@ -34,7 +34,7 @@ impl Handler<Connect> for WsServer {
         );
         // Dumb var to get less verbose code in the following IFs
         let ct = event.watch_for.change_type;
-        // Insert in the right category depending on the type
+        // Insert in the right category depending on the ChangeType
         if ct == ChangeType::AllTypes || ct == ChangeType::Insert {
             self.insert_tables
                 .entry(event.watch_for.change_table.to_owned())
@@ -53,7 +53,7 @@ impl Handler<Connect> for WsServer {
                 .or_insert_with(HashSet::new)
                 .insert(id);
         }
-        // Send the new id back
+        // Send the new id back so the ws_session can save it in the actor
         id
     }
 }

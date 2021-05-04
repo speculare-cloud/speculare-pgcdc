@@ -9,11 +9,13 @@ use std::collections::{HashMap, HashSet};
 #[rtype(result = "()")]
 pub struct WsData(pub String);
 
+/// Struct used to hold session information
 pub struct SessionInfo {
     pub watch_for: WsWatchFor,
     pub recipient: Recipient<WsData>,
 }
 
+/// Server struct holding what the server need to run correctly
 pub struct WsServer {
     /// Contains the id and the addr of the Ws reciever
     pub sessions: HashMap<usize, SessionInfo>,

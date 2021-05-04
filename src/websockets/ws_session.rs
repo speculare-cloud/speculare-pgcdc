@@ -12,6 +12,7 @@ const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 /// How long before lack of client response causes a timeout
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// Struct holding serssion information such as id, heartbeat time, ...
 pub struct WsSession {
     /// unique session id
     pub id: usize,
@@ -98,18 +99,18 @@ impl WsSession {
     /// Also this method checks heartbeats from client
     fn hb(&self, ctx: &mut ws::WebsocketContext<Self>) {
         ctx.run_interval(HEARTBEAT_INTERVAL, |act, ctx| {
-            // check client heartbeats
+            // Check client heartbeats
             if Instant::now().duration_since(act.hb) > CLIENT_TIMEOUT {
-                // heartbeat timed out
+                // Heartbeat timed out
                 error!("Websocket Client heartbeat failed, disconnecting!");
-                // notify WsServer to drop the current act.id
+                // Notify WsServer to drop the current act.id
                 act.addr.do_send(handler_disconnect::Disconnect {
                     id: act.id,
                     change_type: act.watch_for.change_type,
                 });
-                // stop actor
+                // Stop actor
                 ctx.stop();
-                // don't send ping anymore
+                // Don't send ping anymore
                 return;
             }
             ctx.ping(b"");

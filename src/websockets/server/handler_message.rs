@@ -20,6 +20,7 @@ impl Handler<ClientMessage> for WsServer {
     type Result = ();
 
     fn handle(&mut self, msg: ClientMessage, _: &mut Context<Self>) {
+        // Send the message
         self.send_message(&msg.change_table, msg.change_type, msg.msg);
     }
 }
