@@ -10,9 +10,14 @@ use std::collections::{HashMap, HashSet};
 #[rtype(result = "()")]
 pub struct WsData(pub String);
 
+pub struct SessionInfo {
+    pub watch_for: WsWatchFor,
+    pub recipient: Recipient<WsData>,
+}
+
 pub struct WsServer {
     /// Contains the id and the addr of the Ws reciever
-    pub sessions: HashMap<usize, (WsWatchFor, Recipient<WsData>)>,
+    pub sessions: HashMap<usize, SessionInfo>,
     /// HashMap of who is listening which table, and name depend on the change type
     pub insert_tables: HashMap<String, HashSet<usize>>,
     pub update_tables: HashMap<String, HashSet<usize>>,
@@ -46,18 +51,13 @@ impl WsServer {
         // Get the Addr of the WS from the sessions hashmap by the id
         if let Some(info) = self.sessions.get(id) {
             // Check if specific filter applies
-            let to_send = if info.0.specific.is_none() {
-                true
-            } else {
-                info.0
-                    .specific
-                    .as_ref()
-                    .unwrap()
-                    .match_specific_filter(message)
+            let to_send = match &info.watch_for.specific {
+                Some(specific) => specific.match_specific_filter(message),
+                None => true,
             };
             // If we need to send the info, just send it
             if to_send {
-                let _ = info.1.do_send(WsData(message.to_string()));
+                let _ = info.recipient.do_send(WsData(message.to_string()));
             }
         }
     }

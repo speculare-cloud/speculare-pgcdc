@@ -1,6 +1,6 @@
 use super::server::ws_server::WsServer;
+use super::specific_filter::{DataType, SpecificFilter};
 use super::ws_session::WsSession;
-use super::ws_specific_filter::{DataType, Op, SpecificFilter};
 use super::ChangeType;
 use super::WsWatchFor;
 
@@ -13,16 +13,14 @@ use std::time::Instant;
 /// Contains info for which table/event/filter we're listening
 #[derive(Deserialize)]
 pub struct ListQueryParams {
-    pub change_table: String,
-    pub change_type: String,
-    pub spf: Option<String>,
+    pub query: String,
 }
 
 /// Entry point for our websocket route
 ///
-/// Use this route like /ws?change_table=table1&change_type=insert&spf=id.eq.12
+/// Use this route like /ws?query=change_type:table:col.eq.val
 ///
-/// The above route will get insert type change from tables1 where id is equals to 12.
+/// Will get change_type event from table where col is equals to val
 pub async fn ws_index(
     req: HttpRequest,
     stream: web::Payload,
@@ -30,64 +28,45 @@ pub async fn ws_index(
     tables: web::Data<Vec<String>>,
     params: Query<ListQueryParams>,
 ) -> Result<HttpResponse, Error> {
-    // Change_table as String owned by this scope
-    // ex: ?change_tables=table_one, table_two
-    // Will register the client in table_one and table_two for the changes requested
-    let change_table = params.change_table.to_owned();
-    // Check if table is * or tables contains the table we asked for
+    let parts: Vec<&str> = params.query.split(':').collect();
+    let lenght = parts.len();
+    if !(2..=3).contains(&lenght) {
+        error!("The request doesn't have the correct number of args.");
+        return Ok(HttpResponse::BadRequest().json("Your request must follow: query=change_type:table:col.eq.val (change_type and table are mandatory)"));
+    };
+    // We're sure that the parts[0] exist as any string splitted at : will give us someting
+    // Except if the String == ":" => but that's ok.
+    let change_type = super::str_to_change_type(parts[0]);
+    // Check if the change_type is not unknown
+    if change_type == ChangeType::Unknown {
+        error!("The TYPE params does not match requirements.");
+        return Ok(HttpResponse::BadRequest().json("The change_type param does not match requirements, valid are: *, insert, update, delete"));
+    }
+    // If the Vec has more or eq than 2 items, means we have a table specified.
+    // We're sure that the [1] exists has we checked for the lenght before.
+    let change_table = parts[1].to_owned();
+    // Check if the request table exists
     if !tables.contains(&change_table) {
         error!("The TABLE the client asked for does not exists");
         return Ok(HttpResponse::BadRequest().json("The TABLE asked for does not exists"));
     }
-
-    // Parse the SpecificFilter <col>.<op>.<val>
-    let specific: Option<SpecificFilter> = match &params.spf {
-        Some(filter) => {
-            // Split the filter by '.'
-            // col  = [0]
-            // op   = [1]
-            // val  = [2]
-            let parts: Vec<&str> = filter.split('.').collect();
-            if parts.len() != 3 {
-                error!("The FILTER params does not match requirements.");
-                return Ok(HttpResponse::BadRequest()
-                    .json("The FILTER params does not match requirements."));
-            } else {
-                // As we only handle a small number of OP,
-                // determine which one we're asking for, and if not found, return 400
-                let op = match parts[1] {
-                    "eq" => Op::Eq,
-                    "pl" => Op::Higher,
-                    "lw" => Op::Lower,
-                    _ => {
-                        error!("The OP params does not match requirements.");
-                        return Ok(HttpResponse::BadRequest()
-                            .json("The OP params does not match requirements."));
-                    }
-                };
-                // Convert the column str to a owned String for latter use
-                let column = parts[0].to_owned();
-
-                // Convert the number if it's a number, else create a String from the str
-                let value = match parts[2].parse::<i64>() {
-                    Ok(nbr) => DataType::Number(nbr),
-                    Err(_) => DataType::String(parts[2].to_owned()),
-                };
-
-                // Return the SpecificFilter object (struct)
-                Some(SpecificFilter { column, value, op })
-            }
+    // Now we need to check if it's needed to specify a filter
+    let specific_filter: Option<SpecificFilter> = if lenght == 3 {
+        let filter = parts[2];
+        let filter_parts: Vec<&str> = filter.splitn(2, ".eq.").collect();
+        // If the filter doesn't hold 2 parts (col & val), fail the request.
+        if filter_parts.len() != 2 {
+            return Ok(HttpResponse::BadRequest().json("The filter part of your request does not comply with: query=change_type:table:col.eq.val"));
         }
-        None => None,
+
+        Some(SpecificFilter {
+            column: filter_parts[0].to_owned(),
+            value: DataType::String(filter_parts[1].to_owned()),
+        })
+    } else {
+        None
     };
 
-    // Convert the change_type to the correct Enum
-    let change_type = super::str_to_change_type(&params.change_type);
-    // Check if the change_type is not unknown
-    if change_type == ChangeType::Unknown {
-        error!("The TYPE params does not match requirements.");
-        return Ok(HttpResponse::BadRequest().json("The TYPE params does not match requirements."));
-    }
     // Upgrade the HTTP connection to a WebSocket one
     ws::start(
         // Construct the WebSocket session with srv addr and WsWatchFor
@@ -98,7 +77,7 @@ pub async fn ws_index(
             watch_for: WsWatchFor {
                 change_table,
                 change_type,
-                specific,
+                specific: specific_filter,
             },
         },
         &req,

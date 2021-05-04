@@ -1,15 +1,15 @@
 pub mod server;
+pub mod specific_filter;
 pub mod ws_dispatcher;
 pub mod ws_index;
 pub mod ws_session;
-pub mod ws_specific_filter;
 
 /// Contains info for what does the Ws is listening to
 #[derive(Clone)]
 pub struct WsWatchFor {
     pub change_table: String,
     pub change_type: ChangeType,
-    pub specific: Option<ws_specific_filter::SpecificFilter>,
+    pub specific: Option<specific_filter::SpecificFilter>,
 }
 
 /// Representation of SQL Change for CDC
@@ -20,6 +20,7 @@ pub enum ChangeType {
     Update = 1,
     Delete = 2,
     Unknown = 3,
+    AllTypes = 4,
 }
 
 impl PartialEq for ChangeType {
@@ -34,6 +35,7 @@ pub fn str_to_change_type(change_type: &str) -> ChangeType {
         "insert" => ChangeType::Insert,
         "update" => ChangeType::Update,
         "delete" => ChangeType::Delete,
+        "*" => ChangeType::AllTypes,
         _ => ChangeType::Unknown,
     }
 }

@@ -21,23 +21,23 @@ impl Handler<Disconnect> for WsServer {
         info!("WS: someone disconnected");
         if self.sessions.remove(&event.id).is_some() {
             // Remove session from all tables registered
-            match event.change_type {
-                ChangeType::Insert => {
-                    for list_sessions in self.insert_tables.values_mut() {
-                        list_sessions.remove(&event.id);
-                    }
+            // Dumb var to get less verbose code in the following IFs
+            let ct = event.change_type;
+            // Insert in the right category depending on the type
+            if ct == ChangeType::AllTypes || ct == ChangeType::Insert {
+                for list_sessions in self.insert_tables.values_mut() {
+                    list_sessions.remove(&event.id);
                 }
-                ChangeType::Update => {
-                    for list_sessions in self.update_tables.values_mut() {
-                        list_sessions.remove(&event.id);
-                    }
+            }
+            if ct == ChangeType::AllTypes || ct == ChangeType::Update {
+                for list_sessions in self.update_tables.values_mut() {
+                    list_sessions.remove(&event.id);
                 }
-                ChangeType::Delete => {
-                    for list_sessions in self.delete_tables.values_mut() {
-                        list_sessions.remove(&event.id);
-                    }
+            }
+            if ct == ChangeType::AllTypes || ct == ChangeType::Delete {
+                for list_sessions in self.delete_tables.values_mut() {
+                    list_sessions.remove(&event.id);
                 }
-                _ => {}
             }
         }
     }

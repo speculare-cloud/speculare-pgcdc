@@ -41,14 +41,15 @@ Usage
 --------------------------
 
 ```
-$ curl url:port/ws?change_table=table1&change_type=insert&spf=id.eq.12
-
-_will get INSERT change from tables1 where id is equals to 12_
+$ curl /ws?query=change_type:table:col.eq.val
 ```
+_will get change_type event from table where col is equals to val
 
-The `change_table` and `change_type` parameters are mandatory, if you're missing them you'll get a 400 error.
+The `change_table` and `table` parameters are mandatory, if you're missing them you'll get a 400 error.
+Change_table can be either of those: *, insert, update, delete.
+Table must be a valid table of your database.
 
-I decided to restrict the API in such way that a single websocket can only listen to one table and to one change_type. This might change in the future if needed, but as of now and in the current shape of Speculare, it's not needed.
+I decided to restrict the API in such way that a single websocket can only listen to one table. This might change in the future if needed, but as of now and in the current shape of Speculare, it's not needed.
 
 Setup Docker
 --------------------------

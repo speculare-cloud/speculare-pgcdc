@@ -1,4 +1,4 @@
-use super::ws_server::{WsData, WsServer};
+use super::ws_server::{SessionInfo, WsData, WsServer};
 use crate::websockets::ChangeType;
 use crate::websockets::WsWatchFor;
 
@@ -25,29 +25,33 @@ impl Handler<Connect> for WsServer {
         // Generate random usize id
         let id = self.rng.gen::<usize>();
         // Define it as session id
-        self.sessions
-            .insert(id, (event.watch_for.to_owned(), event.addr));
+        self.sessions.insert(
+            id,
+            SessionInfo {
+                watch_for: event.watch_for.to_owned(),
+                recipient: event.addr,
+            },
+        );
+        // Dumb var to get less verbose code in the following IFs
+        let ct = event.watch_for.change_type;
         // Insert in the right category depending on the type
-        match event.watch_for.change_type {
-            ChangeType::Insert => {
-                self.insert_tables
-                    .entry(event.watch_for.change_table)
-                    .or_insert_with(HashSet::new)
-                    .insert(id);
-            }
-            ChangeType::Update => {
-                self.update_tables
-                    .entry(event.watch_for.change_table)
-                    .or_insert_with(HashSet::new)
-                    .insert(id);
-            }
-            ChangeType::Delete => {
-                self.delete_tables
-                    .entry(event.watch_for.change_table)
-                    .or_insert_with(HashSet::new)
-                    .insert(id);
-            }
-            _ => {}
+        if ct == ChangeType::AllTypes || ct == ChangeType::Insert {
+            self.insert_tables
+                .entry(event.watch_for.change_table.to_owned())
+                .or_insert_with(HashSet::new)
+                .insert(id);
+        }
+        if ct == ChangeType::AllTypes || ct == ChangeType::Update {
+            self.update_tables
+                .entry(event.watch_for.change_table.to_owned())
+                .or_insert_with(HashSet::new)
+                .insert(id);
+        }
+        if ct == ChangeType::AllTypes || ct == ChangeType::Delete {
+            self.delete_tables
+                .entry(event.watch_for.change_table)
+                .or_insert_with(HashSet::new)
+                .insert(id);
         }
         // Send the new id back
         id
