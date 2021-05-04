@@ -1,5 +1,4 @@
-use crate::websockets::ChangeType;
-use crate::websockets::WsWatchFor;
+use crate::websockets::{ChangeType, WsWatchFor};
 
 use actix::prelude::*;
 use rand::{self, rngs::ThreadRng};

@@ -1,7 +1,6 @@
 pub mod server;
 pub mod specific_filter;
 pub mod ws_dispatcher;
-pub mod ws_index;
 pub mod ws_session;
 
 /// Contains info for what does the Ws is listening to

@@ -1,17 +1,16 @@
 #[macro_use]
 extern crate log;
 
-use actix::Actor;
-use tokio::sync::broadcast;
-use tokio_postgres::SimpleQueryMessage;
-
 mod cdc;
+mod handlers;
 mod logger;
 mod server;
 mod websockets;
 
-use websockets::server::ws_server::WsServer;
-use websockets::ws_dispatcher;
+use actix::Actor;
+use tokio::sync::broadcast;
+use tokio_postgres::SimpleQueryMessage;
+use websockets::{server::ws_server::WsServer, ws_dispatcher};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {

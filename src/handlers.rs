@@ -1,8 +1,9 @@
-use super::server::ws_server::WsServer;
-use super::specific_filter::{DataType, SpecificFilter};
-use super::ws_session::WsSession;
-use super::ChangeType;
-use super::WsWatchFor;
+use crate::websockets::{
+    server::ws_server::WsServer,
+    specific_filter::{DataType, SpecificFilter},
+    ws_session::WsSession,
+    ChangeType, WsWatchFor,
+};
 
 use actix::prelude::*;
 use actix_web::{web, web::Query, Error, HttpRequest, HttpResponse};
@@ -36,7 +37,7 @@ pub async fn ws_index(
     };
     // We're sure that the parts[0] exist as any string splitted at : will give us someting
     // Except if the String == ":" => but that's ok.
-    let change_type = super::str_to_change_type(parts[0]);
+    let change_type = crate::websockets::str_to_change_type(parts[0]);
     // Check if the change_type is not unknown
     if change_type == ChangeType::Unknown {
         error!("The TYPE params does not match requirements.");

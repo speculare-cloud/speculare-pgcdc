@@ -2,8 +2,11 @@ use futures::StreamExt;
 use postgres_protocol::message::backend::ReplicationMessage;
 use std::time::{Duration, UNIX_EPOCH};
 use tokio::sync::broadcast::Sender;
-use tokio_postgres::replication_client::{ReplicationClient, SnapshotMode};
-use tokio_postgres::{connect_replication, NoTls, ReplicationMode};
+use tokio_postgres::{
+    connect_replication,
+    replication_client::{ReplicationClient, SnapshotMode},
+    NoTls, ReplicationMode,
+};
 
 const TIME_SEC_CONVERSION: u64 = 946_684_800;
 

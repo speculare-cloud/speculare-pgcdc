@@ -1,5 +1,7 @@
-use super::server::{handler_connect, handler_disconnect, ws_server};
-use super::WsWatchFor;
+use super::{
+    server::{handler_connect, handler_disconnect, ws_server},
+    WsWatchFor,
+};
 
 use actix::prelude::*;
 use actix_web_actors::ws;
