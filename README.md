@@ -34,9 +34,11 @@ $ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 $ sudo apt-get install libssl-dev libpq-dev pkg-config build-essential
 ```
 
-There pretty much only one step in this setup (other than Docker (see below))
+There pretty much only one step in this setup (other than Docker (see below) and is optional)
 
 - Create a .env file based on .env.example
+
+> **⚠ WARNING: The postgres instance you're going to use need to be configured for logical replication (see [pg-docker/pg.conf.sample](pg-docker/pg.conf.sample)).** 
 
 Usage
 --------------------------
