@@ -1,7 +1,7 @@
 FROM postgres:13
 
 RUN apt-get update \
-	&& apt-get install postgresql-13-wal2json
+	&& apt-get install -y postgresql-13-wal2json postgresql-13-partman
 
 LABEL maintainer="Speculare"
 
