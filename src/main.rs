@@ -2,7 +2,6 @@
 extern crate log;
 
 mod pg_cdc;
-mod handlers;
 mod server;
 mod websockets;
 

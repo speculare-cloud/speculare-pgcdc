@@ -1,4 +1,4 @@
-use crate::{handlers, websockets::server::ws_server::WsServer};
+use crate::{websockets, websockets::server::ws_server::WsServer};
 
 use actix_web::{middleware, App, HttpServer};
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
@@ -28,7 +28,10 @@ pub async fn server(wsc: actix::Addr<WsServer>, tables: Vec<String>) -> std::io:
             .data(tables.clone())
             .route("/ping", actix_web::web::get().to(|| async { "zpour" }))
             .route("/ping", actix_web::web::head().to(|| async { "zpour" }))
-            .route("/ws", actix_web::web::get().to(handlers::ws_index))
+            .route(
+                "/ws",
+                actix_web::web::get().to(websockets::handlers::ws_index),
+            )
     });
     // Bind and run the server on HTTP or HTTPS depending on the mode of compilation.
     let binding = std::env::var("BINDING").expect("BINDING must be set");

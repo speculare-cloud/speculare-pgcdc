@@ -1,3 +1,4 @@
+pub mod handlers;
 pub mod server;
 pub mod specific_filter;
 pub mod ws_dispatcher;
