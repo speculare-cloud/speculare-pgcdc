@@ -47,6 +47,7 @@ pub async fn ws_index(
     // We're sure that the [1] exists has we checked for the lenght before.
     let change_table = parts[1].to_owned();
     // Check if the request table exists
+    // TODO - Fix this if the table does not exists due to PARTMAN
     if !tables.contains(&change_table) {
         error!("The TABLE the client asked for does not exists");
         return Ok(HttpResponse::BadRequest().json("The TABLE asked for does not exists"));
