@@ -47,10 +47,20 @@ pub async fn ws_index(
     // We're sure that the [1] exists has we checked for the lenght before.
     let change_table = parts[1].to_owned();
     // Check if the request table exists
-    // TODO - Fix this if the table does not exists due to PARTMAN
     if !tables.contains(&change_table) {
-        error!("The TABLE the client asked for does not exists");
-        return Ok(HttpResponse::BadRequest().json("The TABLE asked for does not exists"));
+        // Check where is the '_' char in the table name (if any)
+        let udr_idx = change_table.find('_');
+        // If '_' is found, check if one table exists with only the first part of the table name
+        // ex: disks_p2020 => disks, so check if disks_template exists. (template because it's used in PARTMAN).
+        let idx = udr_idx.unwrap_or_default();
+        if udr_idx.is_none()
+            || !tables
+                .iter()
+                .any(|x| &x[idx..] == "_template" && x[..idx] == change_table[..idx])
+        {
+            error!("The TABLE the client asked for does not exists");
+            return Ok(HttpResponse::BadRequest().json("The TABLE asked for does not exists"));
+        }
     }
     // Now we need to check if it's needed to specify a filter
     let specific_filter: Option<SpecificFilter> = if lenght == 3 {
