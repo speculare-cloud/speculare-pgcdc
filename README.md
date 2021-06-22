@@ -39,7 +39,7 @@ There pretty much only one step in this setup (other than Docker (see below) and
 
 - Create a .env file based on .env.example
 
-> **⚠ WARNING: The postgres instance you're going to use need to be configured for logical replication (see [pg-docker/pg.conf.sample](pg-docker/pg.conf.sample)). Moreover the instance must have partman extension installed and loaded as well as wal2json.**
+> **⚠ WARNING: Check the [docs](https://docs.speculare.cloud) !**
 
 Usage
 --------------------------
