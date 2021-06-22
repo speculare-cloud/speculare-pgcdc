@@ -26,7 +26,7 @@ pub async fn ws_index(
     req: HttpRequest,
     stream: web::Payload,
     srv: web::Data<Addr<WsServer>>,
-    tables: web::Data<Vec<String>>,
+    tables: web::Data<[&'static str; 8]>,
     params: Query<ListQueryParams>,
 ) -> Result<HttpResponse, Error> {
     let parts: Vec<&str> = params.query.split(':').collect();
@@ -47,7 +47,7 @@ pub async fn ws_index(
     // We're sure that the [1] exists has we checked for the lenght before.
     let change_table = parts[1].to_owned();
     // Check if the request table exists
-    if !tables.contains(&change_table) {
+    if !tables.contains(&change_table.as_str()) {
         // Check where is the '_' char in the table name (if any)
         let udr_idx = change_table.find('_');
         // If '_' is found, check if one table exists with only the first part of the table name

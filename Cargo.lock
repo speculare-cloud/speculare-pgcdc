@@ -1357,6 +1357,7 @@ dependencies = [
  "dotenv",
  "env_logger",
  "futures",
+ "lazy_static",
  "log",
  "openssl",
  "postgres-protocol",

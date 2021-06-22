@@ -1,4 +1,4 @@
-use crate::{websockets, websockets::server::ws_server::WsServer};
+use crate::{websockets, websockets::server::ws_server::WsServer, TABLES};
 
 use actix_web::{middleware, App, HttpServer};
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
@@ -17,7 +17,7 @@ fn get_ssl_builder() -> openssl::ssl::SslAcceptorBuilder {
 }
 
 /// Construct and run the actix server instance.
-pub async fn server(wsc: actix::Addr<WsServer>, tables: Vec<String>) -> std::io::Result<()> {
+pub async fn server(wsc: actix::Addr<WsServer>) -> std::io::Result<()> {
     // Construct the HttpServer instance.
     // Passing the pool of PgConnection and defining the logger / compress middleware.
     let serv = HttpServer::new(move || {
@@ -25,7 +25,7 @@ pub async fn server(wsc: actix::Addr<WsServer>, tables: Vec<String>) -> std::io:
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::default())
             .data(wsc.clone())
-            .data(tables.clone())
+            .data(*TABLES)
             .route("/ping", actix_web::web::get().to(|| async { "zpour" }))
             .route("/ping", actix_web::web::head().to(|| async { "zpour" }))
             .route(

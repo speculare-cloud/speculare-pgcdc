@@ -39,7 +39,7 @@ There pretty much only one step in this setup (other than Docker (see below) and
 
 - Create a .env file based on .env.example
 
-> **⚠ WARNING: The postgres instance you're going to use need to be configured for logical replication (see [pg-docker/pg.conf.sample](pg-docker/pg.conf.sample)). Moreover the instance must have partman extension installed and loaded as well as wal2json.**
+> **⚠ WARNING: Check the [docs](https://docs.speculare.cloud) !**
 
 Usage
 --------------------------
@@ -54,26 +54,6 @@ Change_table can be either of those: *, insert, update, delete.
 Table must be a valid table of your database.
 
 I decided to restrict the API in such way that a single websocket can only listen to one table. This might change in the future if needed, but as of now and in the current shape of Speculare, it's not needed.
-
-Setup Docker
---------------------------
-
-In order to make developing on this project easier, I've made a Docker image of the Postgres server with the appropriate config as well as some testing scripts. You can use them by following the instructions below.
-
-If you don't have Docker installed yet, you can try to install it by running:
-```bash
-$ ./scripts/installDocker.sh
-```
-
-You first need to build the image of the database container:
-```bash
-$ ./scripts/startPgDocker.sh
-```
-
-Then you can run the following script that will create the test tables and INSERT / UPDATE data inside the database to trigger changes:
-```bash
-$ ./scripts/test.sh
-```
 
 Contributing
 --------------------------

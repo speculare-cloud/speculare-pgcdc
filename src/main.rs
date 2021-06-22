@@ -7,8 +7,13 @@ mod websockets;
 
 use actix::Actor;
 use tokio::sync::broadcast;
-use tokio_postgres::SimpleQueryMessage;
 use websockets::{server::ws_server::WsServer, ws_dispatcher};
+
+lazy_static::lazy_static! {
+    static ref TABLES: [&'static str; 8] = {
+        ["hosts", "cputimes", "cpustats", "ioblocks", "loadavg", "memory", "swap", "ionets"]
+    };
+}
 
 fn configure_logger() {
     // Check if the RUST_LOG already exist in the sys
@@ -50,30 +55,11 @@ async fn main() -> std::io::Result<()> {
     // Init the ws_dispatcher before init_cdc_listener because the latter will fail if no subscriber are waiting
     ws_dispatcher::init_ws_dispatcher(ws_server.clone(), tx.clone());
 
-    // Get all tables contained in the Database
-    let query = "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';";
-    let tables = rclient
-        .simple_query(&query)
-        .await
-        .unwrap()
-        .into_iter()
-        .filter_map(|msg| {
-            if let SimpleQueryMessage::Row(row) = msg {
-                match row.get(0) {
-                    Some(val) => Some(val.to_owned()),
-                    _ => None,
-                }
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
-
     // Init the replication slot and read the stream of change
     pg_cdc::init_cdc_listener(rclient, tx);
 
     // Start the Actix server and so the websocket client
-    server::server(ws_server, tables).await?;
+    server::server(ws_server).await?;
 
     // Return Ok
     Ok(())

@@ -1,3 +1,5 @@
+use crate::TABLES;
+
 use super::server::{handler_message, ws_server};
 
 use serde_json::Value;
@@ -32,6 +34,17 @@ pub fn init_ws_dispatcher(ws_server: actix::Addr<ws_server::WsServer>, tx: Sende
                     Some(table_name) => match change["kind"].as_str() {
                         // If the change kind exist
                         Some(change_type) => {
+                            // Get the table name from the _hyper_x_x_chunk
+                            let table_name = if table_name.starts_with("_hyper_") {
+                                let mut parts = table_name.splitn(4, '_');
+                                let idx = match parts.nth(2) {
+                                    Some(val) => val.parse::<usize>().unwrap() - 1,
+                                    None => return table_name.to_owned(),
+                                };
+                                TABLES[idx].to_owned()
+                            } else {
+                                table_name.to_owned()
+                            };
                             // We just send the info to the ws_server which will then broadcast
                             // the change to all the websocket listening for it
                             ws_server.do_send(handler_message::ClientMessage {
