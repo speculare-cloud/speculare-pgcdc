@@ -8,6 +8,7 @@ use tokio_postgres::{
     NoTls, ReplicationMode,
 };
 
+/// This represent the time between the real EPOCH and the EPOCH Postgres is using.
 const TIME_SEC_CONVERSION: u64 = 946_684_800;
 
 /// Open a replication connection to the Postgresql server and maintain the connection open on a task.
@@ -106,7 +107,6 @@ pub fn init_cdc_listener(mut rclient: ReplicationClient, tx: Sender<String>) {
                     // Send the JSON to dispatcher consumer using this solution for the queue of the mpmc
                     // This fail only if no receiver are waiting for the sender, in our case it's safe to assume
                     // that if tx.send() fail, we panic! because our program is fucked up at this point
-                    // TODO - If this fail, create a new Receiver by calling tx.subscribe in the appropriate task.
                     if let Err(err) = tx.send(json.to_owned()) {
                         error!("Fatal error, can't send to the channel: {}", err);
                         std::process::exit(1);

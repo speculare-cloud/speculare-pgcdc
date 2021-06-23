@@ -9,6 +9,12 @@ use actix::Actor;
 use tokio::sync::broadcast;
 use websockets::{server::ws_server::WsServer, ws_dispatcher};
 
+// Static array to hold the tables in the order of creation in the database.
+// As we use TimescaleDB, each table get partitioned using a patern like "_hyper_x_y_chunk",
+// which don't give us the opportunity to detect which table is being updated/inserted.
+// As the client will connect to the WS using the base table name, this array is used for lookup.
+// The patern always follow the same naming convention: "_hyper_(table_creation_order_from_1)_(partition_number)_chunk".
+// So we use this array to derive the name of the table from the patern naming chunk.
 lazy_static::lazy_static! {
     static ref TABLES: [&'static str; 8] = {
         ["hosts", "cputimes", "cpustats", "ioblocks", "loadavg", "memory", "swap", "ionets"]
@@ -41,11 +47,11 @@ async fn main() -> std::io::Result<()> {
     // Init the logger and set the debug level correctly
     configure_logger();
 
-    // Form replication connection
-    // And keep the connection open
+    // Form replication connection & keep the connection open
     let rclient = pg_cdc::connect_replica().await;
 
     // A multi-producer, multi-consumer broadcast queue. Each sent value is seen by all consumers.
+    // 16 is the number of messages that can be queued up before older messages get dropped.
     let (tx, _) = broadcast::channel(16);
 
     // Start WsServer actor
