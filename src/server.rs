@@ -53,7 +53,7 @@ pub async fn server(wsc: actix::Addr<WsServer>) -> std::io::Result<()> {
             .route("/ws", actix_web::web::get().to(handlers::ws_index))
     });
     // Bind and run the server on HTTP or HTTPS depending on the mode of compilation.
-    let binding = CONFIG.get_str("CONNINFO").expect("BINDING must be set");
+    let binding = CONFIG.get_str("BINDING").expect("BINDING must be set");
     // Check if we should enable https
     let https = CONFIG.get_bool("HTTPS");
     // Bind the server (https or no)
