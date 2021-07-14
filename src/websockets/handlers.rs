@@ -4,6 +4,7 @@ use crate::websockets::{
     ws_session::WsSession,
     ChangeType, WsWatchFor,
 };
+use crate::TABLE_SIZE;
 
 use actix::prelude::*;
 use actix_web::{web, web::Query, Error, HttpRequest, HttpResponse};
@@ -26,7 +27,7 @@ pub async fn ws_index(
     req: HttpRequest,
     stream: web::Payload,
     srv: web::Data<Addr<WsServer>>,
-    tables: web::Data<[&'static str; 8]>,
+    tables: web::Data<[&'static str; TABLE_SIZE]>,
     params: Query<ListQueryParams>,
 ) -> Result<HttpResponse, Error> {
     let parts: Vec<&str> = params.query.split(':').collect();

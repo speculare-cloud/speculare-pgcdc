@@ -10,6 +10,8 @@ use config::Config;
 use tokio::sync::broadcast;
 use websockets::{server::ws_server::WsServer, ws_dispatcher};
 
+const TABLE_SIZE: usize = 9;
+
 // Static array to hold the tables in the order of creation in the database.
 // As we use TimescaleDB, each table get partitioned using a patern like "_hyper_x_y_chunk",
 // which don't give us the opportunity to detect which table is being updated/inserted.
@@ -17,7 +19,7 @@ use websockets::{server::ws_server::WsServer, ws_dispatcher};
 // The patern always follow the same naming convention: "_hyper_(table_creation_order_from_1)_(partition_number)_chunk".
 // So we use this array to derive the name of the table from the patern naming chunk.
 lazy_static::lazy_static! {
-    static ref TABLES: [&'static str; 9] = {
+    static ref TABLES: [&'static str; TABLE_SIZE] = {
         ["hosts", "cputimes", "cpustats", "ioblocks", "loadavg", "memory", "swap", "ionets", "alerts"]
     };
 }
