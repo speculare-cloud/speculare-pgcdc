@@ -11,7 +11,7 @@ actix = "0.11.1"
 actix-web = { version = "4.0.0-beta.6", features = ["openssl"] }
 actix-http = { version = "3.0.0-beta.6", features = ["openssl"] }
 actix-web-actors = { git = "https://github.com/actix/actix-web", tag = "web-v4.0.0-beta.6" }
-dotenv = "0.15"
+config = "0.11"
 env_logger = "0.8"
 futures = "0.3"
 lazy_static = "1.4"

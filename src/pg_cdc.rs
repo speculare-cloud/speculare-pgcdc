@@ -1,3 +1,5 @@
+use super::CONFIG;
+
 use futures::StreamExt;
 use postgres_protocol::message::backend::ReplicationMessage;
 use std::time::{Duration, UNIX_EPOCH};
@@ -14,7 +16,7 @@ const TIME_SEC_CONVERSION: u64 = 946_684_800;
 /// Open a replication connection to the Postgresql server and maintain the connection open on a task.
 pub async fn connect_replica() -> ReplicationClient {
     // Connection information to postgres
-    let conninfo = &std::env::var("CONNINFO").expect("BINDING must be set");
+    let conninfo = &CONFIG.get_str("CONNINFO").expect("Missing CONNINFO");
 
     // Form replication connection
     let (rclient, rconnection) =
@@ -44,9 +46,8 @@ pub async fn init_replication_slot(rclient: &mut ReplicationClient, slot_name: &
     // Clean up previous replication slot (if any) named slot_name
     let resp = rclient.drop_replication_slot(slot_name, true).await;
     // Assert that the drop was done successfully
-    assert_eq!(
+    assert!(
         resp.is_ok(),
-        true,
         "Error while dropping previous replication slot: {:?}",
         resp.err()
     );
@@ -58,9 +59,8 @@ pub async fn init_replication_slot(rclient: &mut ReplicationClient, slot_name: &
         .create_logical_replication_slot(slot_name, true, plugin, no_export)
         .await;
     // Assert that the creation was done successfully
-    assert_eq!(
+    assert!(
         resp.is_ok(),
-        true,
         "Error while creating the replication slot: {:?}",
         resp.err()
     );

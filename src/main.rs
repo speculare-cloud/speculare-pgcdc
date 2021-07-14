@@ -6,6 +6,7 @@ mod server;
 mod websockets;
 
 use actix::Actor;
+use config::Config;
 use tokio::sync::broadcast;
 use websockets::{server::ws_server::WsServer, ws_dispatcher};
 
@@ -16,24 +17,27 @@ use websockets::{server::ws_server::WsServer, ws_dispatcher};
 // The patern always follow the same naming convention: "_hyper_(table_creation_order_from_1)_(partition_number)_chunk".
 // So we use this array to derive the name of the table from the patern naming chunk.
 lazy_static::lazy_static! {
-    static ref TABLES: [&'static str; 8] = {
-        ["hosts", "cputimes", "cpustats", "ioblocks", "loadavg", "memory", "swap", "ionets"]
+    static ref TABLES: [&'static str; 9] = {
+        ["hosts", "cputimes", "cpustats", "ioblocks", "loadavg", "memory", "swap", "ionets", "alerts"]
     };
 }
 
-fn configure_logger() {
+// Lazy static of the Config which is loaded from Alerts.toml
+lazy_static::lazy_static! {
+    static ref CONFIG: Config = {
+        let mut config = Config::default();
+        config.merge(config::File::with_name("Pgcdc")).unwrap();
+        config
+    };
+}
+
+/// Configure the logger level for any binary calling it
+fn configure_logger(level: String) {
     // Check if the RUST_LOG already exist in the sys
     if std::env::var_os("RUST_LOG").is_none() {
         // if it doesn't, assign a default value to RUST_LOG
         // Define RUST_LOG as trace for debug and error for prod
-        std::env::set_var(
-            "RUST_LOG",
-            if cfg!(debug_assertions) {
-                "info,actix_server=info,actix_web=info"
-            } else {
-                "error,actix_server=error,actix_web=error"
-            },
-        );
+        std::env::set_var("RUST_LOG", level);
     }
     // Init the logger
     env_logger::init();
@@ -41,11 +45,12 @@ fn configure_logger() {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    // Load env variable from .env
-    dotenv::dotenv().ok();
-
     // Init the logger and set the debug level correctly
-    configure_logger();
+    configure_logger(
+        CONFIG
+            .get_str("RUST_LOG")
+            .unwrap_or_else(|_| "error,actix_server=info,actix_web=error".into()),
+    );
 
     // Form replication connection & keep the connection open
     let rclient = pg_cdc::connect_replica().await;

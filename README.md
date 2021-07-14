@@ -37,7 +37,7 @@ $ sudo apt-get install libssl-dev libpq-dev pkg-config build-essential
 
 There pretty much only one step in this setup (other than Docker (see below) and is optional)
 
-- Create a .env file based on .env.example
+- Create a Pgcdc.toml file based on Example.toml
 
 > **⚠ WARNING: Check the [docs](https://docs.speculare.cloud) !**
 

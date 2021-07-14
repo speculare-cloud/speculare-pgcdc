@@ -1,4 +1,5 @@
-use crate::{websockets, websockets::server::ws_server::WsServer, TABLES};
+use super::CONFIG;
+use super::{websockets, websockets::server::ws_server::WsServer, TABLES};
 
 use actix_web::{middleware, App, HttpServer};
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
@@ -8,8 +9,8 @@ use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 /// Use KEY_PRIV and KEY_CERT environement variable for the path to find the files.
 fn get_ssl_builder() -> openssl::ssl::SslAcceptorBuilder {
     // Getting the KEY path for both cert & priv key
-    let key = std::env::var("KEY_PRIV").expect("BINDING must be set");
-    let cert = std::env::var("KEY_CERT").expect("BINDING must be set");
+    let key = CONFIG.get_str("KEY_PRIV").expect("BINDING must be set");
+    let cert = CONFIG.get_str("KEY_CERT").expect("BINDING must be set");
     // Construct the SslAcceptor builder by setting the SslMethod as tls.
     let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
     // Add the files (key & cert) to the builder
@@ -37,11 +38,11 @@ pub async fn server(wsc: actix::Addr<WsServer>) -> std::io::Result<()> {
             )
     });
     // Bind and run the server on HTTP or HTTPS depending on the mode of compilation.
-    let binding = std::env::var("BINDING").expect("BINDING must be set");
+    let binding = CONFIG.get_str("CONNINFO").expect("BINDING must be set");
     // Check if we should enable https
-    let https = std::env::var("HTTPS");
+    let https = CONFIG.get_bool("HTTPS");
     // Bind the server (https or no)
-    if https.is_err() || https.unwrap() == "NO" {
+    if https.is_err() || !https.unwrap() {
         if !cfg!(debug_assertions) {
             warn!("You're starting speculare-server as HTTP on a production build")
         } else {
