@@ -7,10 +7,10 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-actix = "0.11.1"
-actix-web = { version = "4.0.0-beta.6", features = ["openssl"] }
-actix-http = { version = "3.0.0-beta.6", features = ["openssl"] }
-actix-web-actors = { git = "https://github.com/actix/actix-web", tag = "web-v4.0.0-beta.6" }
+actix = "0.12"
+actix-web = { version = "4.0.0-beta.8", features = ["openssl"] }
+actix-http = { version = "3.0.0-beta.8", features = ["openssl"] }
+actix-web-actors = { git = "https://github.com/actix/actix-web", tag = "web-v4.0.0-beta.8" }
 config = "0.11"
 env_logger = "0.8"
 futures = "0.3"

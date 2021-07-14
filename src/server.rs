@@ -1,5 +1,5 @@
 use super::CONFIG;
-use super::{websockets, websockets::server::ws_server::WsServer, TABLES};
+use super::{websockets::handlers, websockets::server::ws_server::WsServer, TABLES};
 
 use actix_web::{middleware, App, HttpServer};
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
@@ -28,14 +28,11 @@ pub async fn server(wsc: actix::Addr<WsServer>) -> std::io::Result<()> {
         App::new()
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::default())
-            .data(wsc.clone())
-            .data(*TABLES)
+            .app_data(actix_web::web::Data::new(wsc.clone()))
+            .app_data(actix_web::web::Data::new(*TABLES))
             .route("/ping", actix_web::web::get().to(|| async { "zpour" }))
             .route("/ping", actix_web::web::head().to(|| async { "zpour" }))
-            .route(
-                "/ws",
-                actix_web::web::get().to(websockets::handlers::ws_index),
-            )
+            .route("/ws", actix_web::web::get().to(handlers::ws_index))
     });
     // Bind and run the server on HTTP or HTTPS depending on the mode of compilation.
     let binding = CONFIG.get_str("CONNINFO").expect("BINDING must be set");

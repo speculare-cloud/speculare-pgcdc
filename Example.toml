@@ -5,3 +5,5 @@ BINDING = "0.0.0.0:8080"
 KEY_PRIV = "key.pem"			# (optional)
 KEY_CERT = "cert.pem"			# (optional)
 HTTPS = true					# (optional [default = false])
+
+RUST_LOG = "info,speculare_pgcdc=trace,actix_server=info,actix_web=info"	# (optional)
