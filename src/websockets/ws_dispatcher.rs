@@ -11,6 +11,7 @@ pub fn init_ws_dispatcher(ws_server: actix::Addr<ws_server::WsServer>, tx: Sende
     let mut rx = tx.subscribe();
     // Spawn the task handling the rest
     tokio::spawn(async move {
+        info!("Successfully started the WsDispatcher");
         loop {
             // Wait until we recv the data
             let value = rx.recv().await;

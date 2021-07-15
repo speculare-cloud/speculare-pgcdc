@@ -27,6 +27,7 @@ pub async fn connect_replica() -> ReplicationClient {
                 std::process::exit(1);
             }
         };
+    info!("Successfully connected to the replication");
 
     // Spawn connection to run on its own
     tokio::spawn(async move {
@@ -51,6 +52,10 @@ pub async fn init_replication_slot(rclient: &mut ReplicationClient, slot_name: &
         "Error while dropping previous replication slot: {:?}",
         resp.err()
     );
+    info!(
+        "Successfully dropped the previous replication slot with name {}",
+        slot_name
+    );
 
     // We set NoExportSnapshot and create the replication slot
     let plugin = "wal2json";
@@ -63,6 +68,10 @@ pub async fn init_replication_slot(rclient: &mut ReplicationClient, slot_name: &
         resp.is_ok(),
         "Error while creating the replication slot: {:?}",
         resp.err()
+    );
+    info!(
+        "Successfully created the logical replication slot with name {}",
+        slot_name
     );
 }
 
@@ -78,6 +87,10 @@ pub fn init_cdc_listener(mut rclient: ReplicationClient, tx: Sender<String>) {
 
         // Get info about the server (xlogpos, dbname, timeline, systemid)
         let identify_system = rclient.identify_system().await.unwrap();
+        info!(
+            "identify_system: postgres answered with: {:?}",
+            identify_system
+        );
 
         // Compute the epoch and register the last_lsn of the stream
         // last_lsn will be updated everytime we read a new value
@@ -86,9 +99,13 @@ pub fn init_cdc_listener(mut rclient: ReplicationClient, tx: Sender<String>) {
 
         // We now switch to consuming the stream
         let mut logical_stream = rclient
-            .start_logical_replication(slot_name, identify_system.xlogpos(), options)
+            .start_logical_replication(slot_name, last_lsn, options)
             .await
             .unwrap();
+        info!(
+            "Started the logical replication at {} with options: {:?}",
+            last_lsn, options
+        );
 
         // Keepalive sent count before a successfull keepalive
         // A successfull keepalive is when Postgres ask us for a reply of 1

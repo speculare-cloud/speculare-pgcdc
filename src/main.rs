@@ -63,6 +63,7 @@ async fn main() -> std::io::Result<()> {
 
     // Start WsServer actor
     let ws_server = WsServer::new().start();
+    info!("Successfully started WsServer");
 
     // Clone the Sender of the broadcast to allow it to be used in two async context
     // Init the ws_dispatcher before init_cdc_listener because the latter will fail if no subscriber are waiting
@@ -70,6 +71,8 @@ async fn main() -> std::io::Result<()> {
 
     // Init the replication slot and read the stream of change
     pg_cdc::init_cdc_listener(rclient, tx);
+
+    info!("Allowed tables are: {:?}", &TABLES[..]);
 
     // Start the Actix server and so the websocket client
     server::server(ws_server).await?;
