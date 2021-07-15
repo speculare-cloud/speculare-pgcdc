@@ -19,10 +19,10 @@ pub fn init_ws_dispatcher(ws_server: actix::Addr<ws_server::WsServer>, tx: Sende
                 error!("Task just got an error: {}", value.err().unwrap());
                 continue;
             }
-            let value = value.unwrap();
+            let mut value = value.unwrap();
             trace!("Dispatcher task got: {}", value);
             // Convert the data to a Value enum of serde_json
-            let data: Value = serde_json::from_str(&value).unwrap();
+            let data: Value = simd_json::from_str(&mut value).unwrap();
             // If the change is not an array, don't handle it
             if !data["change"].is_array() {
                 continue;
