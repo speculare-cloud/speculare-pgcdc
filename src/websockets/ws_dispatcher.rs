@@ -40,7 +40,7 @@ pub fn init_ws_dispatcher(ws_server: actix::Addr<ws_server::WsServer>, tx: Sende
                             let table_name = if table_name.starts_with("_hyper_") {
                                 let mut parts = table_name.splitn(4, '_');
                                 let idx = match parts.nth(2) {
-                                    Some(val) => val.parse::<usize>().unwrap(),
+                                    Some(val) => val.parse::<usize>().unwrap() - 1,
                                     None => return table_name.to_owned(),
                                 };
                                 match TABLES_BY_INDEX.read().unwrap().get(&idx) {
