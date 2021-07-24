@@ -23,45 +23,58 @@ pub fn init_ws_dispatcher(ws_server: actix::Addr<ws_server::WsServer>, tx: Sende
             trace!("Dispatcher task got: {}", value);
             // Convert the data to a Value enum of serde_json
             let data: Value = simd_json::from_str(&mut value).unwrap();
-            // If the change is not an array, don't handle it
-            if !data["change"].is_array() {
+            // Extract what we really want
+            let changes = data["change"].as_array();
+            // If the changes is None, we don't continue
+            if changes.is_none() {
                 continue;
             }
-            // For every change in the changes, we do as follow
-            for change in data["change"].as_array().unwrap() {
+            // For each change inside of changes, we do the following treatment
+            for change in changes.unwrap() {
                 // Check the table (to str (using a match for safety))
-                match change["table"].as_str() {
-                    // If the table name exist, we match for the change kind
-                    Some(table_name) => match change["kind"].as_str() {
-                        // If the change kind exist
-                        Some(change_type) => {
-                            // Get the table name from the _hyper_x_x_chunk
-                            // See comment in the main.rs for more information.
-                            let table_name = if table_name.starts_with("_hyper_") {
-                                let mut parts = table_name.splitn(4, '_');
-                                let idx = match parts.nth(2) {
-                                    Some(val) => val.parse::<usize>().unwrap() - 1,
-                                    None => return table_name.to_owned(),
-                                };
-                                match TABLES_BY_INDEX.read().unwrap().get(&idx) {
-                                    Some(val) => val.to_owned(),
-                                    None => continue,
-                                }
-                            } else {
-                                table_name.to_owned()
-                            };
-                            // We just send the info to the ws_server which will then broadcast
-                            // the change to all the websocket listening for it
-                            ws_server.do_send(handler_message::ClientMessage {
-                                msg: change.to_owned(),
-                                change_table: table_name.to_string(),
-                                change_type: super::str_to_change_type(change_type),
-                            });
+                if let (Some(table_name), Some(change_type)) =
+                    (change["table"].as_str(), change["kind"].as_str())
+                {
+                    // Get the table name from the _hyper_x_x_chunk
+                    // See comment in the main.rs for more information.
+                    let table_name = if table_name.starts_with("_hyper_") {
+                        let mut parts = table_name.splitn(4, '_');
+                        let idx = match parts.nth(2) {
+                            Some(val) => val.parse::<i8>().unwrap() - 1,
+                            None => {
+                                error!("Table {} cannot be deconstructed into an idx", table_name);
+                                continue;
+                            }
+                        };
+                        // Get the table name from the index and return an owned String
+                        // or continue the loop and skip this value if not found.
+                        match TABLES_BY_INDEX.read().unwrap().get(&(idx as usize)) {
+                            Some(val) => val.to_owned(),
+                            None => {
+                                error!(
+                                    "Table not found inside TABLES_BY_INDEX: {} and index: {}",
+                                    table_name, idx
+                                );
+                                continue;
+                            }
                         }
-                        None => error!("Dispatcher don't know the type of the change"),
-                    },
-                    None => error!("Dispatcher don't know the targeted table"),
-                };
+                    } else {
+                        table_name.to_owned()
+                    };
+                    // We just send the info to the ws_server which will then broadcast
+                    // the change to all the websocket listening for it
+                    ws_server.do_send(handler_message::ClientMessage {
+                        msg: change.to_owned(),
+                        change_table: table_name.to_string(),
+                        change_type: super::str_to_change_type(change_type),
+                    });
+                } else {
+                    error!(
+                        "Dispatcher doesn't know the targeted table ({:?}) or change_type ({:?}).",
+                        change["table"].as_str(),
+                        change["kind"].as_str()
+                    );
+                }
             }
         }
     });
