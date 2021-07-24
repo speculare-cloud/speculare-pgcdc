@@ -43,7 +43,7 @@ pub fn init_ws_dispatcher(ws_server: actix::Addr<ws_server::WsServer>, tx: Sende
                                     Some(val) => val.parse::<usize>().unwrap() - 1,
                                     None => return table_name.to_owned(),
                                 };
-                                TABLES[idx].to_owned()
+                                TABLES.read().unwrap()[idx].to_owned()
                             } else {
                                 table_name.to_owned()
                             };

@@ -1,5 +1,5 @@
 use super::CONFIG;
-use super::{websockets::handlers, websockets::server::ws_server::WsServer, TABLES};
+use super::{websockets::handlers, websockets::server::ws_server::WsServer};
 
 use actix_web::{middleware, App, HttpServer};
 use rustls::internal::pemfile::{certs, pkcs8_private_keys, rsa_private_keys};
@@ -47,7 +47,6 @@ pub async fn server(wsc: actix::Addr<WsServer>) -> std::io::Result<()> {
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::default())
             .app_data(actix_web::web::Data::new(wsc.clone()))
-            .app_data(actix_web::web::Data::new(*TABLES))
             .route("/ping", actix_web::web::get().to(|| async { "zpour" }))
             .route("/ping", actix_web::web::head().to(|| async { "zpour" }))
             .route("/ws", actix_web::web::get().to(handlers::ws_index))

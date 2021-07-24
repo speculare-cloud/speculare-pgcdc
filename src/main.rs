@@ -7,10 +7,10 @@ mod websockets;
 
 use actix::Actor;
 use config::Config;
+use std::sync::RwLock;
 use tokio::sync::broadcast;
+use tokio_postgres::SimpleQueryMessage;
 use websockets::{server::ws_server::WsServer, ws_dispatcher};
-
-const TABLE_SIZE: usize = 9;
 
 // Static array to hold the tables in the order of creation in the database.
 // As we use TimescaleDB, each table get partitioned using a patern like "_hyper_x_y_chunk",
@@ -19,8 +19,8 @@ const TABLE_SIZE: usize = 9;
 // The patern always follow the same naming convention: "_hyper_(table_creation_order_from_1)_(partition_number)_chunk".
 // So we use this array to derive the name of the table from the patern naming chunk.
 lazy_static::lazy_static! {
-    static ref TABLES: [&'static str; TABLE_SIZE] = {
-        ["hosts", "cputimes", "cpustats", "ioblocks", "loadavg", "memory", "swap", "ionets", "alerts"]
+    static ref TABLES: RwLock<Vec<String>> = {
+        RwLock::new(Vec::new())
     };
 }
 
@@ -69,10 +69,26 @@ async fn main() -> std::io::Result<()> {
     // Init the ws_dispatcher before init_cdc_listener because the latter will fail if no subscriber are waiting
     ws_dispatcher::init_ws_dispatcher(ws_server.clone(), tx.clone());
 
+    // Get all tables contained in the Database
+    let query = "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';";
+    rclient
+        .simple_query(&query)
+        .await
+        .unwrap()
+        .into_iter()
+        .for_each(|msg| {
+            // And push them to the TABLES Vec
+            if let SimpleQueryMessage::Row(row) = msg {
+                if let Some(val) = row.get(0) {
+                    TABLES.write().unwrap().push(val.to_owned())
+                }
+            }
+        });
+
     // Init the replication slot and read the stream of change
     pg_cdc::init_cdc_listener(rclient, tx);
 
-    info!("Allowed tables are: {:?}", &TABLES[..]);
+    info!("Allowed tables are: {:?}", &TABLES.read().unwrap());
 
     // Start the Actix server and so the websocket client
     server::server(ws_server).await?;

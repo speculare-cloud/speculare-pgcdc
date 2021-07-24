@@ -4,7 +4,7 @@ use crate::websockets::{
     ws_session::WsSession,
     ChangeType, WsWatchFor,
 };
-use crate::TABLE_SIZE;
+use crate::TABLES;
 
 use actix::prelude::*;
 use actix_web::{web, web::Query, Error, HttpRequest, HttpResponse};
@@ -27,7 +27,6 @@ pub async fn ws_index(
     req: HttpRequest,
     stream: web::Payload,
     srv: web::Data<Addr<WsServer>>,
-    tables: web::Data<[&'static str; TABLE_SIZE]>,
     params: Query<ListQueryParams>,
 ) -> Result<HttpResponse, Error> {
     let parts: Vec<&str> = params.query.split(':').collect();
@@ -48,14 +47,16 @@ pub async fn ws_index(
     // We're sure that the [1] exists has we checked for the lenght before.
     let change_table = parts[1].to_owned();
     // Check if the request table exists
-    if !tables.contains(&change_table.as_str()) {
+    if !TABLES.read().unwrap().contains(&change_table) {
         // Check where is the '_' char in the table name (if any)
         let udr_idx = change_table.find('_');
         // If '_' is found, check if one table exists with only the first part of the table name
         // ex: disks_p2020 => disks, so check if disks_template exists. (template because it's used in PARTMAN).
         let idx = udr_idx.unwrap_or_default();
         if udr_idx.is_none()
-            || !tables
+            || !TABLES
+                .read()
+                .unwrap()
                 .iter()
                 .any(|x| &x[idx..] == "_template" && x[..idx] == change_table[..idx])
         {
