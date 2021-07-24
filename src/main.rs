@@ -7,6 +7,7 @@ mod websockets;
 
 use actix::Actor;
 use config::Config;
+use std::collections::HashMap;
 use std::sync::RwLock;
 use tokio::sync::broadcast;
 use tokio_postgres::SimpleQueryMessage;
@@ -21,6 +22,19 @@ use websockets::{server::ws_server::WsServer, ws_dispatcher};
 lazy_static::lazy_static! {
     static ref TABLES: RwLock<Vec<String>> = {
         RwLock::new(Vec::new())
+    };
+
+    static ref TABLES_BY_INDEX: RwLock<HashMap<usize, String>> = {
+        RwLock::new([
+            (0, "disks".into()),
+            (1, "cputimes".into()),
+            (2, "cpustats".into()),
+            (3, "ioblocks".into()),
+            (4, "loadavg".into()),
+            (5, "memory".into()),
+            (6, "swap".into()),
+            (7, "ionets".into())
+        ].iter().cloned().collect())
     };
 }
 

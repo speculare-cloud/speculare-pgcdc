@@ -1,4 +1,4 @@
-use crate::TABLES;
+use crate::TABLES_BY_INDEX;
 
 use super::server::{handler_message, ws_server};
 
@@ -40,10 +40,13 @@ pub fn init_ws_dispatcher(ws_server: actix::Addr<ws_server::WsServer>, tx: Sende
                             let table_name = if table_name.starts_with("_hyper_") {
                                 let mut parts = table_name.splitn(4, '_');
                                 let idx = match parts.nth(2) {
-                                    Some(val) => val.parse::<usize>().unwrap() - 1,
+                                    Some(val) => val.parse::<usize>().unwrap(),
                                     None => return table_name.to_owned(),
                                 };
-                                TABLES.read().unwrap()[idx].to_owned()
+                                match TABLES_BY_INDEX.read().unwrap().get(&idx) {
+                                    Some(val) => val.to_owned(),
+                                    None => continue,
+                                }
                             } else {
                                 table_name.to_owned()
                             };
