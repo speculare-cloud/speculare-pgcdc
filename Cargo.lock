@@ -1542,7 +1542,7 @@ dependencies = [
 
 [[package]]
 name = "speculare-pgcdc"
-version = "0.1.0"
+version = "0.0.4"
 dependencies = [
  "actix",
  "actix-http",
