@@ -1,10 +1,10 @@
-use crate::websockets::{
-    server::ws_server::WsServer,
-    specific_filter::{DataType, SpecificFilter},
-    ws_session::WsSession,
-    ChangeType, WsWatchFor,
-};
 use crate::TABLES;
+use crate::{
+    utils::specific_filter::{DataType, SpecificFilter},
+    websockets::{
+        client::ws_client::WsClient, server::ws_server::WsServer, ChangeType, WsWatchFor,
+    },
+};
 
 use actix::prelude::*;
 use actix_web::{web, web::Query, Error, HttpRequest, HttpResponse};
@@ -84,7 +84,7 @@ pub async fn ws_index(
     // Upgrade the HTTP connection to a WebSocket one
     ws::start(
         // Construct the WebSocket session with srv addr and WsWatchFor
-        WsSession {
+        WsClient {
             id: 0,
             hb: Instant::now(),
             addr: srv.get_ref().clone(),

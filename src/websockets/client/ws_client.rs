@@ -1,4 +1,4 @@
-use super::{
+use crate::websockets::{
     server::{handler_connect, handler_disconnect, ws_server},
     WsWatchFor,
 };
@@ -13,7 +13,7 @@ const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Struct holding serssion information such as id, heartbeat time, ...
-pub struct WsSession {
+pub struct WsClient {
     /// unique session id
     pub id: usize,
     /// Client must send ping at least once per 10 seconds (CLIENT_TIMEOUT), otherwise we drop connection.
@@ -24,9 +24,10 @@ pub struct WsSession {
     pub watch_for: WsWatchFor,
 }
 
-impl Actor for WsSession {
+impl Actor for WsClient {
     type Context = ws::WebsocketContext<Self>;
 
+    /// Function called at the begining of the Ws connection between Client & Server
     fn started(&mut self, ctx: &mut Self::Context) {
         // Start the heartbeat for this session
         self.hb(ctx);
@@ -50,6 +51,7 @@ impl Actor for WsSession {
             .wait(ctx);
     }
 
+    /// Called when the Actor is stopped
     fn stopping(&mut self, _: &mut Self::Context) -> Running {
         // Just send a disconnect message to the server
         self.addr.do_send(handler_disconnect::Disconnect {
@@ -61,16 +63,18 @@ impl Actor for WsSession {
 }
 
 /// Handle messages from WsServer, we simply send it to peer websocket
-impl Handler<ws_server::WsData> for WsSession {
+impl Handler<ws_server::WsData> for WsClient {
     type Result = ();
 
+    // Send the msg to the Client
     fn handle(&mut self, msg: ws_server::WsData, ctx: &mut Self::Context) {
         ctx.text(msg.0);
     }
 }
 
 /// WebSocket message handler
-impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
+impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
+    // Handle message received from the Client
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
         match msg {
             Ok(ws::Message::Ping(msg)) => {
@@ -93,7 +97,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
     }
 }
 
-impl WsSession {
+impl WsClient {
     /// Helper method that sends ping to client every second.
     ///
     /// Also this method checks heartbeats from client

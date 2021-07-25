@@ -1,5 +1,4 @@
-use super::CONFIG;
-use super::{websockets::handlers, websockets::server::ws_server::WsServer};
+use super::{handlers, websockets::server::ws_server::WsServer, CONFIG};
 
 use actix_web::{middleware, App, HttpServer};
 use rustls::internal::pemfile::{certs, pkcs8_private_keys, rsa_private_keys};

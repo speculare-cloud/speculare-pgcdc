@@ -1,15 +1,15 @@
-pub mod handlers;
+use crate::utils::specific_filter::SpecificFilter;
+
+pub mod cdc_transmitter;
+pub mod client;
 pub mod server;
-pub mod specific_filter;
-pub mod ws_dispatcher;
-pub mod ws_session;
 
 /// Contains info for what does the Ws is listening to
 #[derive(Clone)]
 pub struct WsWatchFor {
     pub change_table: String,
     pub change_type: ChangeType,
-    pub specific: Option<specific_filter::SpecificFilter>,
+    pub specific: Option<SpecificFilter>,
 }
 
 /// Representation of SQL Change for CDC

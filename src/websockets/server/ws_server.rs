@@ -58,6 +58,8 @@ impl WsServer {
             };
             // If we need to send the info, just send it
             if to_send {
+                // This send the message to:
+                // => client/ws_client.rs -> Handler<ws_server::WsData> for WsClient -> fn handle
                 let _ = info.recipient.do_send(WsData(message.to_string()));
             }
         }

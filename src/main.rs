@@ -1,8 +1,10 @@
 #[macro_use]
 extern crate log;
 
-mod pg_cdc;
+mod cdc;
+mod handlers;
 mod server;
+mod utils;
 mod websockets;
 
 use actix::Actor;
@@ -11,7 +13,7 @@ use std::collections::HashMap;
 use std::sync::RwLock;
 use tokio::sync::broadcast;
 use tokio_postgres::SimpleQueryMessage;
-use websockets::{server::ws_server::WsServer, ws_dispatcher};
+use websockets::{cdc_transmitter, server::ws_server::WsServer};
 
 // Static array to hold the tables in the order of creation in the database.
 // As we use TimescaleDB, each table get partitioned using a patern like "_hyper_x_y_chunk",
@@ -69,7 +71,7 @@ async fn main() -> std::io::Result<()> {
     );
 
     // Form replication connection & keep the connection open
-    let rclient = pg_cdc::connect_replica().await;
+    let rclient = cdc::replication_utils::connect_replica().await;
 
     // A multi-producer, multi-consumer broadcast queue. Each sent value is seen by all consumers.
     // 16 is the number of messages that can be queued up before older messages get dropped.
@@ -81,7 +83,7 @@ async fn main() -> std::io::Result<()> {
 
     // Clone the Sender of the broadcast to allow it to be used in two async context
     // Init the ws_dispatcher before init_cdc_listener because the latter will fail if no subscriber are waiting
-    ws_dispatcher::init_ws_dispatcher(ws_server.clone(), tx.clone());
+    cdc_transmitter::launch_broadcaster(ws_server.clone(), tx.clone());
 
     // Get all tables contained in the Database
     let query = "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';";
@@ -100,7 +102,7 @@ async fn main() -> std::io::Result<()> {
         });
 
     // Init the replication slot and read the stream of change
-    pg_cdc::init_cdc_listener(rclient, tx);
+    cdc::cdc_broadcaster::launch_broadcaster(rclient, tx);
 
     info!("Allowed tables are: {:?}", &TABLES.read().unwrap());
 

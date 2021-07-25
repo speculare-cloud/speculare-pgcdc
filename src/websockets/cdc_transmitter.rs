@@ -6,7 +6,7 @@ use serde_json::Value;
 use tokio::sync::broadcast::Sender;
 
 /// Start a new task which loop over the broadcast's value it may send and dispatch them to websocket.
-pub fn init_ws_dispatcher(ws_server: actix::Addr<ws_server::WsServer>, tx: Sender<String>) {
+pub fn launch_broadcaster(ws_server: actix::Addr<ws_server::WsServer>, tx: Sender<String>) {
     // Create the Receiver for the broadcast
     let mut rx = tx.subscribe();
     // Spawn the task handling the rest
@@ -63,6 +63,8 @@ pub fn init_ws_dispatcher(ws_server: actix::Addr<ws_server::WsServer>, tx: Sende
                     };
                     // We just send the info to the ws_server which will then broadcast
                     // the change to all the websocket listening for it
+                    // Send a message using:
+                    // => server/handler_message.rs -> fn handle
                     ws_server.do_send(handler_message::ClientMessage {
                         msg: change.to_owned(),
                         change_table: table_name.to_string(),

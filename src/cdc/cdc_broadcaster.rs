@@ -1,96 +1,28 @@
-use super::CONFIG;
+use super::replication_utils;
 
 use futures::StreamExt;
 use postgres_protocol::message::backend::ReplicationMessage;
 use std::time::{Duration, UNIX_EPOCH};
 use tokio::sync::broadcast::Sender;
-use tokio_postgres::{
-    connect_replication,
-    replication_client::{ReplicationClient, SnapshotMode},
-    NoTls, ReplicationMode,
-};
+use tokio_postgres::replication_client::ReplicationClient;
 
 /// This represent the time between the real EPOCH and the EPOCH Postgres is using.
 const TIME_SEC_CONVERSION: u64 = 946_684_800;
 
-/// Open a replication connection to the Postgresql server and maintain the connection open on a task.
-pub async fn connect_replica() -> ReplicationClient {
-    // Connection information to postgres
-    let conninfo = &CONFIG.get_str("CONNINFO").expect("Missing CONNINFO");
-
-    // Form replication connection
-    let (rclient, rconnection) =
-        match connect_replication(conninfo, NoTls, ReplicationMode::Logical).await {
-            Ok((rc, rco)) => (rc, rco),
-            Err(err) => {
-                error!("Fatal error, postgres connection: {}", err);
-                std::process::exit(1);
-            }
-        };
-    info!("Successfully connected to the replication");
-
-    // Spawn connection to run on its own
-    tokio::spawn(async move {
-        // rconnection will never return except on Error
-        // as long as no error, the connection is open.
-        if let Err(err) = rconnection.await {
-            error!("Fatal error, postgres connection: {}", err);
-            std::process::exit(1);
-        }
-    });
-
-    rclient
-}
-
-/// Drop previous replication slot and create a new one
-pub async fn init_replication_slot(rclient: &mut ReplicationClient, slot_name: &str) {
-    // Clean up previous replication slot (if any) named slot_name
-    let resp = rclient.drop_replication_slot(slot_name, true).await;
-    // Assert that the drop was done successfully
-    assert!(
-        resp.is_ok(),
-        "Error while dropping previous replication slot: {:?}",
-        resp.err()
-    );
-    info!(
-        "Successfully dropped the previous replication slot with name {}",
-        slot_name
-    );
-
-    // We set NoExportSnapshot and create the replication slot
-    let plugin = "wal2json";
-    let no_export = Some(SnapshotMode::NoExportSnapshot);
-    let resp = rclient
-        .create_logical_replication_slot(slot_name, true, plugin, no_export)
-        .await;
-    // Assert that the creation was done successfully
-    assert!(
-        resp.is_ok(),
-        "Error while creating the replication slot: {:?}",
-        resp.err()
-    );
-    info!(
-        "Successfully created the logical replication slot with name {}",
-        slot_name
-    );
-}
-
 /// Call init_replication_slot() and start the stream + read it.
-pub fn init_cdc_listener(mut rclient: ReplicationClient, tx: Sender<String>) {
+/// It will also broadcast the message to the cdc_transmitter.
+pub fn launch_broadcaster(mut rclient: ReplicationClient, tx: Sender<String>) {
     tokio::spawn(async move {
         // Define constants for the logical slot
         let slot_name = "pgcdc_repl";
         let options = &[("pretty-print", "0")];
 
         // Drop previous and create new replication slot
-        init_replication_slot(&mut rclient, &slot_name).await;
+        replication_utils::init_replication_slot(&mut rclient, &slot_name).await;
 
         // Get info about the server (xlogpos, dbname, timeline, systemid)
         let identify_system = rclient.identify_system().await.unwrap();
-        info!(
-            "identify_system: postgres answered with: {:?}",
-            identify_system
-        );
+        info!("identify_system: answered with: {:?}", identify_system);
 
         // Compute the epoch and register the last_lsn of the stream
         // last_lsn will be updated everytime we read a new value
@@ -102,10 +34,7 @@ pub fn init_cdc_listener(mut rclient: ReplicationClient, tx: Sender<String>) {
             .start_logical_replication(slot_name, last_lsn, options)
             .await
             .unwrap();
-        info!(
-            "Started the logical replication at {} with options: {:?}",
-            last_lsn, options
-        );
+        info!("logical stream started at {}", last_lsn);
 
         // Keepalive sent count before a successfull keepalive
         // A successfull keepalive is when Postgres ask us for a reply of 1
@@ -143,10 +72,7 @@ pub fn init_cdc_listener(mut rclient: ReplicationClient, tx: Sender<String>) {
                         // If more than 5 keepalive were sent before one success
                         // we just exit and crash because we're prolly spamming the CPU and the network.
                         if keepalive_sent_count > 5 {
-                            error!(
-                                "Fatal error, too much keepalive == 1: {}",
-                                keepalive_sent_count
-                            );
+                            error!("Fatal ! Too much keepalive == 1: {}", keepalive_sent_count);
                             std::process::exit(1);
                         }
                         // Calculating the epoch for the packet
