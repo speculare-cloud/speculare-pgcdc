@@ -73,7 +73,15 @@ pub async fn client_connected(
     // Return a `Future` that is basically a state machine managing
     // this specific user's connection.
     // Every time the client sends a message, do nothing
-    while user_ws_rx.next().await.is_some() {}
+    while let Some(result) = user_ws_rx.next().await {
+        let msg = match result {
+            Ok(msg) => msg,
+            Err(e) => {
+                eprintln!("websocket error(uid={}): {}", my_id, e);
+                break;
+            }
+        };
+    }
 
     // user_ws_rx stream will keep processing as long as the user stays
     // connected. Once they disconnect, then...
