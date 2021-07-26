@@ -1,12 +1,10 @@
-use crate::TABLES_BY_INDEX;
-
-use crate::websockets::{
-    self,
-    server::{handler_message, ws_server},
-};
+use super::{ServerState, DELETE, INSERT, UPDATE};
+use crate::{websockets, TABLES_BY_INDEX};
 
 use serde_json::Value;
+use std::{collections::HashSet, sync::Arc};
 use tokio::sync::broadcast::Sender;
+use warp::ws::Message;
 
 /// Get the table name from an &str, returning a String
 /// This is used due to TimescaleDB renaming the hypertable using a
@@ -35,8 +33,41 @@ fn get_table_name(table_name: &str) -> String {
     table_name.to_owned()
 }
 
+/// Send a message to a specific group of sessions (insert, update or delete)
+fn send_message(
+    message: &serde_json::Value,
+    sessions: Option<&HashSet<usize>>,
+    server_state: &Arc<ServerState>,
+) {
+    // If no session were defined, skip
+    if sessions.is_none() {
+        return;
+    }
+    // For every sessions'id in the tables HashMap
+    for id in sessions.unwrap() {
+        // Get the client from the clients list inside the server_state
+        if let Some(client) = server_state.clients.read().unwrap().get(id) {
+            // Check if the client asked for a particular filter
+            let to_send = match &client.watch_for.specific {
+                Some(specific) => specific.match_filter(message),
+                None => true,
+            };
+
+            if to_send {
+                // Send the message to the client
+                if let Err(_disconnected) = client
+                    .gate
+                    .send(Ok(Message::text(message.as_str().unwrap())))
+                {
+                    error!("Client disconnected, should be dropped soon");
+                }
+            }
+        }
+    }
+}
+
 /// Start a new task which loop over the broadcast's value it may send and dispatch them to websocket.
-pub fn launch_broadcaster(ws_server: actix::Addr<ws_server::WsServer>, tx: Sender<String>) {
+pub fn launch_broadcaster(tx: Sender<String>, server_state: Arc<ServerState>) {
     // Create the Receiver for the broadcast
     let mut rx = tx.subscribe();
     // Spawn the task handling the rest
@@ -79,15 +110,26 @@ pub fn launch_broadcaster(ws_server: actix::Addr<ws_server::WsServer>, tx: Sende
                     // At this stage, the change_flag can be only be one of INSERT, UPDATE, DELETE
                     // but not multiple of them.
                     websockets::apply_flag(&mut change_flag, change_type);
-                    // We just send the info to the ws_server which will then broadcast
-                    // the change to all the websocket listening for it
-                    // Send a message using:
-                    // => server/handler_message.rs -> fn handle
-                    ws_server.do_send(handler_message::ClientMessage {
-                        msg: change.to_owned(),
-                        change_table: table_name.to_string(),
-                        change_flag,
-                    });
+                    // Only send the message to those interested in the change_type
+                    if has_bit!(change_flag, INSERT) {
+                        // First get the lock over the RwLock guard
+                        let lock = server_state.inserts.read().unwrap();
+                        // Then get the sessions out of it
+                        let sessions = lock.get(&table_name);
+                        // And finally send the message to each client inside that sessions HashSet
+                        send_message(change, sessions, &server_state);
+                    } else if has_bit!(change_flag, UPDATE) {
+                        let lock = server_state.updates.read().unwrap();
+                        let sessions = lock.get(&table_name);
+                        send_message(change, sessions, &server_state);
+                    } else if has_bit!(change_flag, DELETE) {
+                        let lock = server_state.deletes.read().unwrap();
+                        let sessions = lock.get(&table_name);
+                        send_message(change, sessions, &server_state);
+                    } else {
+                        error!("Change {:?} not handled (yet).", change_flag);
+                        continue;
+                    };
                 } else {
                     error!(
                         "Table ({:?}) or change_type ({:?}) not present.",

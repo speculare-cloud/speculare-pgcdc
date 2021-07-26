@@ -8,18 +8,16 @@ macro_rules! has_bit {
 }
 
 mod cdc;
-mod handlers;
 mod server;
 mod utils;
 mod websockets;
 
-use actix::Actor;
 use config::Config;
 use std::collections::HashMap;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 use tokio::sync::broadcast;
 use tokio_postgres::SimpleQueryMessage;
-use websockets::{cdc_transmitter, server::ws_server::WsServer};
+use websockets::{cdc_transmitter, ServerState};
 
 // Static array to hold the tables in the order of creation in the database.
 // As we use TimescaleDB, each table get partitioned using a patern like "_hyper_x_y_chunk",
@@ -67,8 +65,8 @@ fn configure_logger(level: String) {
     env_logger::init();
 }
 
-#[actix_web::main]
-async fn main() -> std::io::Result<()> {
+#[tokio::main]
+async fn main() {
     // Init the logger and set the debug level correctly
     configure_logger(
         CONFIG
@@ -83,13 +81,14 @@ async fn main() -> std::io::Result<()> {
     // 16 is the number of messages that can be queued up before older messages get dropped.
     let (tx, _) = broadcast::channel(16);
 
-    // Start WsServer actor
-    let ws_server = WsServer::new().start();
-    info!("Successfully started WsServer");
+    // Construct our default server state
+    let server_state = Arc::new(ServerState::default());
+    // Clone a version of our server_state for broadcasting
+    let cserver_state = server_state.clone();
 
     // Clone the Sender of the broadcast to allow it to be used in two async context
     // Init the ws_dispatcher before init_cdc_listener because the latter will fail if no subscriber are waiting
-    cdc_transmitter::launch_broadcaster(ws_server.clone(), tx.clone());
+    cdc_transmitter::launch_broadcaster(tx.clone(), cserver_state);
 
     // Get all tables contained in the Database
     let query = "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';";
@@ -112,9 +111,6 @@ async fn main() -> std::io::Result<()> {
 
     info!("Allowed tables are: {:?}", &TABLES.read().unwrap());
 
-    // Start the Actix server and so the websocket client
-    server::server(ws_server).await?;
-
-    // Return Ok
-    Ok(())
+    // Start the Warp server
+    server::run_server(server_state).await
 }
