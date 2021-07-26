@@ -1,9 +1,7 @@
 use crate::TABLES;
 use crate::{
     utils::specific_filter::{DataType, SpecificFilter},
-    websockets::{
-        client::ws_client::WsClient, server::ws_server::WsServer, ChangeType, WsWatchFor,
-    },
+    websockets::{self, client::ws_client::WsClient, server::ws_server::WsServer, WsWatchFor},
 };
 
 use actix::prelude::*;
@@ -35,11 +33,14 @@ pub async fn ws_index(
         error!("The request doesn't have the correct number of args.");
         return Ok(HttpResponse::BadRequest().json("Your request must follow: query=change_type:table:col.eq.val (change_type and table are mandatory)"));
     };
+    // Construct the u8 value holding our flags
+    let mut change_flag = 0u8;
     // We're sure that the parts[0] exist as any string splitted at : will give us someting
-    // Except if the String == ":" => but that's ok.
-    let change_type = crate::websockets::str_to_change_type(parts[0]);
+    parts[0]
+        .split(',')
+        .for_each(|ctype| websockets::apply_flag(&mut change_flag, ctype));
     // Check if the change_type is not unknown
-    if change_type == ChangeType::Unknown {
+    if change_flag == 0 {
         error!("The TYPE params does not match requirements.");
         return Ok(HttpResponse::BadRequest().json("The change_type param does not match requirements, valid are: *, insert, update, delete"));
     }
@@ -74,7 +75,7 @@ pub async fn ws_index(
         }
 
         Some(SpecificFilter {
-            column: filter_parts[0].to_owned(),
+            column: serde_json::Value::String(filter_parts[0].to_owned()),
             value: DataType::String(filter_parts[1].to_owned()),
         })
     } else {
@@ -90,7 +91,7 @@ pub async fn ws_index(
             addr: srv.get_ref().clone(),
             watch_for: WsWatchFor {
                 change_table,
-                change_type,
+                change_flag,
                 specific: specific_filter,
             },
         },

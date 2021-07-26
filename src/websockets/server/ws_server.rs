@@ -1,4 +1,4 @@
-use crate::websockets::{ChangeType, WsWatchFor};
+use crate::websockets::WsWatchFor;
 
 use actix::prelude::*;
 use rand::{self, rngs::ThreadRng};
@@ -44,53 +44,6 @@ impl WsServer {
             delete_tables: HashMap::with_capacity(16),
             // Random thread-local number generator
             rng: rand::thread_rng(),
-        }
-    }
-
-    /// Sending message to the target id respecting the specific filter (if some)
-    fn send_to_id(&self, id: &usize, message: &serde_json::Value) {
-        // Get the Addr of the WS from the sessions hashmap by the id
-        if let Some(info) = self.sessions.get(id) {
-            // Check if specific filter applies
-            let to_send = match &info.watch_for.specific {
-                Some(specific) => specific.match_specific_filter(message),
-                None => true,
-            };
-            // If we need to send the info, just send it
-            if to_send {
-                // This send the message to:
-                // => client/ws_client.rs -> Handler<ws_server::WsData> for WsClient -> fn handle
-                let _ = info.recipient.do_send(WsData(message.to_string()));
-            }
-        }
-    }
-
-    /// Send message to all websocket listening for table
-    pub fn send_message(
-        &self,
-        change_table: &str,
-        change_type: ChangeType,
-        message: serde_json::Value,
-    ) {
-        let sessions: Option<&HashSet<usize>> = match change_type {
-            // Get all sessions for the table we're sending event
-            ChangeType::Insert => self.insert_tables.get(change_table),
-            ChangeType::Update => self.update_tables.get(change_table),
-            ChangeType::Delete => self.delete_tables.get(change_table),
-            // If none of the above, we don't handle it
-            _ => {
-                error!("Change {:?} not handled (yet).", change_type);
-                return;
-            }
-        };
-        // If no session were defined, skip
-        if sessions.is_none() {
-            return;
-        }
-        // For every sessions ID in the tables HashMap
-        for id in sessions.unwrap() {
-            // Send the message to the ID (checking the specific filter, ...)
-            self.send_to_id(id, &message);
         }
     }
 }

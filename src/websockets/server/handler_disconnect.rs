@@ -1,6 +1,6 @@
-use super::ws_server::WsServer;
+use crate::websockets::{DELETE, INSERT, UPDATE};
 
-use crate::websockets::ChangeType;
+use super::ws_server::WsServer;
 
 use actix::prelude::*;
 
@@ -9,7 +9,7 @@ use actix::prelude::*;
 #[rtype(result = "()")]
 pub struct Disconnect {
     pub id: usize,
-    pub change_type: ChangeType,
+    pub change_flag: u8,
 }
 
 /// Handler for Disconnect message.
@@ -24,21 +24,21 @@ impl Handler<Disconnect> for WsServer {
         if self.sessions.remove(&event.id).is_some() {
             // Remove session from all tables registered
             // Dumb var to get less verbose code in the following IFs
-            let ct = event.change_type;
+            let change_flag = event.change_flag;
             // Delete in the right category depending on the type
-            if ct == ChangeType::AllTypes || ct == ChangeType::Insert {
+            if has_bit!(change_flag, INSERT) {
                 // For each table entries, remove the id of the ws_session
                 for list_sessions in self.insert_tables.values_mut() {
                     // Even if the event.id is not in the list_sessions, it will try
                     list_sessions.remove(&event.id);
                 }
             }
-            if ct == ChangeType::AllTypes || ct == ChangeType::Update {
+            if has_bit!(change_flag, UPDATE) {
                 for list_sessions in self.update_tables.values_mut() {
                     list_sessions.remove(&event.id);
                 }
             }
-            if ct == ChangeType::AllTypes || ct == ChangeType::Delete {
+            if has_bit!(change_flag, DELETE) {
                 for list_sessions in self.delete_tables.values_mut() {
                     list_sessions.remove(&event.id);
                 }

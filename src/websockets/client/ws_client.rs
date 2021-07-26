@@ -56,7 +56,7 @@ impl Actor for WsClient {
         // Just send a disconnect message to the server
         self.addr.do_send(handler_disconnect::Disconnect {
             id: self.id,
-            change_type: self.watch_for.change_type,
+            change_flag: self.watch_for.change_flag,
         });
         Running::Stop
     }
@@ -110,7 +110,7 @@ impl WsClient {
                 // Notify WsServer to drop the current act.id
                 act.addr.do_send(handler_disconnect::Disconnect {
                     id: act.id,
-                    change_type: act.watch_for.change_type,
+                    change_flag: act.watch_for.change_flag,
                 });
                 // Stop actor
                 ctx.stop();

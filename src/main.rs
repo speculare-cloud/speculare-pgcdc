@@ -1,6 +1,12 @@
 #[macro_use]
 extern crate log;
 
+macro_rules! has_bit {
+    ($a:expr,$b:expr) => {
+        ($a & $b) != 0
+    };
+}
+
 mod cdc;
 mod handlers;
 mod server;

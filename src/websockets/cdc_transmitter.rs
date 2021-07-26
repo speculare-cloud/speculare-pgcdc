@@ -1,6 +1,9 @@
 use crate::TABLES_BY_INDEX;
 
-use super::server::{handler_message, ws_server};
+use crate::websockets::{
+    self,
+    server::{handler_message, ws_server},
+};
 
 use serde_json::Value;
 use tokio::sync::broadcast::Sender;
@@ -61,6 +64,11 @@ pub fn launch_broadcaster(ws_server: actix::Addr<ws_server::WsServer>, tx: Sende
                     } else {
                         table_name.to_owned()
                     };
+                    // Construct the change_flag
+                    let mut change_flag = 0u8;
+                    // At this stage, the change_flag can be only be one of INSERT, UPDATE, DELETE
+                    // but not multiple of them.
+                    websockets::apply_flag(&mut change_flag, change_type);
                     // We just send the info to the ws_server which will then broadcast
                     // the change to all the websocket listening for it
                     // Send a message using:
@@ -68,7 +76,7 @@ pub fn launch_broadcaster(ws_server: actix::Addr<ws_server::WsServer>, tx: Sende
                     ws_server.do_send(handler_message::ClientMessage {
                         msg: change.to_owned(),
                         change_table: table_name.to_string(),
-                        change_type: super::str_to_change_type(change_type),
+                        change_flag,
                     });
                 } else {
                     error!(

@@ -1,6 +1,6 @@
 use super::ws_server::{SessionInfo, WsData, WsServer};
 
-use crate::websockets::{ChangeType, WsWatchFor};
+use crate::websockets::{WsWatchFor, DELETE, INSERT, UPDATE};
 
 use actix::prelude::*;
 use rand::{self, Rng};
@@ -33,21 +33,21 @@ impl Handler<Connect> for WsServer {
             },
         );
         // Dumb var to get less verbose code in the following IFs
-        let ct = event.watch_for.change_type;
+        let change_flag = event.watch_for.change_flag;
         // Insert in the right category depending on the ChangeType
-        if ct == ChangeType::AllTypes || ct == ChangeType::Insert {
+        if has_bit!(change_flag, INSERT) {
             self.insert_tables
                 .entry(event.watch_for.change_table.to_owned())
                 .or_insert_with(HashSet::new)
                 .insert(id);
         }
-        if ct == ChangeType::AllTypes || ct == ChangeType::Update {
+        if has_bit!(change_flag, UPDATE) {
             self.update_tables
                 .entry(event.watch_for.change_table.to_owned())
                 .or_insert_with(HashSet::new)
                 .insert(id);
         }
-        if ct == ChangeType::AllTypes || ct == ChangeType::Delete {
+        if has_bit!(change_flag, DELETE) {
             self.delete_tables
                 .entry(event.watch_for.change_table)
                 .or_insert_with(HashSet::new)
