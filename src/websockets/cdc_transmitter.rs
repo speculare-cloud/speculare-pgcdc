@@ -44,23 +44,29 @@ pub fn launch_broadcaster(ws_server: actix::Addr<ws_server::WsServer>, tx: Sende
         info!("Successfully started the WsDispatcher");
         loop {
             // Wait until we recv the data
-            let value = rx.recv().await;
-            if value.is_err() {
-                error!("Task just got an error: {}", value.err().unwrap());
-                continue;
-            }
-            let mut value = value.unwrap();
-            trace!("Dispatcher task got: {}", value);
+            let mut value = match rx.recv().await {
+                Ok(val) => {
+                    trace!("Dispatcher task got: {}", val);
+                    val
+                }
+                Err(e) => {
+                    error!("Task just got an error: {}", e);
+                    continue;
+                }
+            };
             // Convert the data to a Value enum of serde_json
+            // Using simd optimization through simd_json crate.
             let data: Value = simd_json::from_str(&mut value).unwrap();
-            // Extract what we really want
-            let changes = data["change"].as_array();
-            // If the changes is None, we don't continue
-            if changes.is_none() {
-                continue;
-            }
+            // Extract what we really want and assert that it exists
+            let changes = match data["change"].as_array() {
+                Some(val) => val,
+                None => {
+                    error!("The message we got doesn't contains a change: {}", data);
+                    continue;
+                }
+            };
             // For each change inside of changes, we do the following treatment
-            for change in changes.unwrap() {
+            for change in changes {
                 // Check the table (to str (using a match for safety))
                 if let (Some(table_name), Some(change_type)) =
                     (change["table"].as_str(), change["kind"].as_str())
