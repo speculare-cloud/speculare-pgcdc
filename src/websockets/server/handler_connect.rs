@@ -21,9 +21,9 @@ impl Handler<Connect> for WsServer {
     type Result = usize;
 
     fn handle(&mut self, event: Connect, _: &mut Context<Self>) -> Self::Result {
-        info!("WS: new connection");
         // Generate random usize id
         let id = self.rng.gen::<usize>();
+        info!("WS: new connection: {}", id);
         // Insert the id into the list of sessions and construct SessionInfo
         self.sessions.insert(
             id,

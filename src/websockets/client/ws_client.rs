@@ -8,9 +8,9 @@ use actix_web_actors::ws;
 use std::time::{Duration, Instant};
 
 /// How often heartbeat pings are sent
-const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
+const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
 /// How long before lack of client response causes a timeout
-const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
+const CLIENT_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Struct holding serssion information such as id, heartbeat time, ...
 pub struct WsClient {
@@ -106,7 +106,10 @@ impl WsClient {
             // Check client heartbeats
             if Instant::now().duration_since(act.hb) > CLIENT_TIMEOUT {
                 // Heartbeat timed out
-                error!("Websocket Client heartbeat failed, disconnecting!");
+                warn!(
+                    "Websocket Client heartbeat failed, disconnecting {}!",
+                    act.id
+                );
                 // Notify WsServer to drop the current act.id
                 act.addr.do_send(handler_disconnect::Disconnect {
                     id: act.id,
