@@ -55,9 +55,7 @@ fn send_message(
 
             if to_send {
                 // Send the message to the client
-                if let Err(_disconnected) = client
-                    .gate
-                    .send(Ok(Message::text(message.as_str().unwrap())))
+                if let Err(_disconnected) = client.gate.send(Ok(Message::text(message.to_string())))
                 {
                     error!("Client disconnected, should be dropped soon");
                 }

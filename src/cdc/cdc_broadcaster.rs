@@ -69,6 +69,7 @@ pub fn launch_broadcaster(mut rclient: ReplicationClient, tx: Sender<String>) {
                     if keepalive.reply() == 1 {
                         // Increment the keepalive count
                         keepalive_sent_count += 1;
+                        info!("Keepalive counter = {}", keepalive_sent_count);
                         // If more than 5 keepalive were sent before one success
                         // we just exit and crash because we're prolly spamming the CPU and the network.
                         if keepalive_sent_count > 5 {
@@ -88,6 +89,7 @@ pub fn launch_broadcaster(mut rclient: ReplicationClient, tx: Sender<String>) {
                             Err(err) => error!("failed to deliver the keepalive due to: {}", err),
                         }
                     } else if keepalive_sent_count != 0 {
+                        info!("Keepalive resetted");
                         // Reset the counter because if we got a reply of 0 it's all good
                         keepalive_sent_count = 0;
                     }
