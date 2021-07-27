@@ -4,12 +4,11 @@ use crate::{
     CONFIG,
 };
 
-use std::net::SocketAddr;
-use std::sync::Arc;
-use warp::hyper::Body;
+use std::{net::SocketAddr, sync::Arc};
 use warp::{
     self,
     http::{Response, StatusCode},
+    hyper::Body,
     Filter, Reply,
 };
 
@@ -103,13 +102,29 @@ pub async fn run_server(server_state: Arc<ServerState>) {
             return;
         }
     };
-    // Run the Warp server infinitly
-    warp::serve(
+    // Check if we should enable https
+    let https = CONFIG.get_bool("HTTPS").unwrap_or(false);
+    let serv = warp::serve(
         warp::any()
             .and(warp::path("ping"))
             .map(|| "zpour")
             .or(ws_handlers),
-    )
-    .run(socket)
-    .await;
+    );
+    if https {
+        let cert_path = CONFIG
+            .get_str("KEY_CERT")
+            .expect("Missing KEY_CERT but HTTPS is true");
+        let key_path = CONFIG
+            .get_str("KEY_PRIV")
+            .expect("Missing KEY_PRIV but HTTPS is true");
+        // Run the Warp server infinitly
+        serv.tls()
+            .cert_path(cert_path)
+            .key_path(key_path)
+            .run(socket)
+            .await;
+    } else {
+        // Run the Warp server infinitly
+        serv.run(socket).await;
+    }
 }
