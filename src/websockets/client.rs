@@ -5,10 +5,18 @@ use super::{ServerState, WsWatchFor, DELETE, INSERT, NEXT_CLIENT_ID, UPDATE};
 use futures::{FutureExt, StreamExt};
 use std::collections::HashSet;
 use std::sync::{atomic::Ordering, Arc};
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
-use warp;
-use warp::ws::WebSocket;
+use warp::{
+    self,
+    ws::{Message, WebSocket},
+};
+
+/// How often heartbeat pings are sent
+const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
+/// How long before lack of client response causes a timeout
+const CLIENT_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub async fn client_connected(
     ws: WebSocket,
@@ -22,8 +30,7 @@ pub async fn client_connected(
     // Split the socket into a sender and receive of messages.
     let (user_ws_tx, mut user_ws_rx) = ws.split();
 
-    // Use an unbounded channel to handle buffering and flushing of messages
-    // to the websocket...
+    // Use an unbounded channel to handle buffering and flushing of messages to the websocket...
     let (tx, rx) = mpsc::unbounded_channel();
     let rx = UnboundedReceiverStream::new(rx);
     tokio::task::spawn(rx.forward(user_ws_tx).map(|result| {
@@ -36,7 +43,7 @@ pub async fn client_connected(
     server_state.clients.write().unwrap().insert(
         my_id,
         SessionInfo {
-            gate: tx,
+            gate: tx.clone(),
             watch_for: watch_for.to_owned(),
         },
     );
@@ -69,18 +76,56 @@ pub async fn client_connected(
             .or_insert_with(HashSet::new)
             .insert(my_id);
     }
-
+    // Construct the heartbeat interval, used to know when to send Ping to the client
+    let mut hb_tick = tokio::time::interval(HEARTBEAT_INTERVAL);
+    // When was the last time the server answered us with a Pong ?
+    let mut hb_pong: Instant = Instant::now();
     // Return a `Future` that is basically a state machine managing
     // this specific user's connection.
     // Every time the client sends a message, do nothing
-    while let Some(result) = user_ws_rx.next().await {
-        let msg = match result {
-            Ok(msg) => msg,
-            Err(e) => {
-                eprintln!("websocket error(uid={}): {}", my_id, e);
-                break;
+    // Run an infinite loop that only stop when the connection is closed or should be
+    loop {
+        // Tokio select will wait on multiple branch, here user_ws_rx.next() and hb_tick.tick()
+        tokio::select! {
+            Some(msg) = user_ws_rx.next() => {
+                match msg {
+                    Ok(msg) => {
+                        match msg {
+                            // If the client sent us a pong message
+                            e if e.is_pong() => {
+                                info!("Pong receive (uid={})", my_id);
+                                hb_pong = Instant::now();
+                            },
+                            // If the client send us a close message
+                            e if e.is_close() => {
+                                info!("Websocket closed (uid={})", my_id);
+                                break;
+                            },
+                            _ => {}
+                        }
+                    },
+                    Err(e) => {
+                        error!("Websocket error (uid={}): {}", my_id, e);
+                        break;
+                    }
+                }
             }
-        };
+            _ = hb_tick.tick() => {
+                // If the lastest hb_pong from the client is oldest than the TIMEOUT
+                if Instant::now().duration_since(hb_pong) > CLIENT_TIMEOUT {
+                    // Breaking will auto close the WS connection
+                    break;
+                }
+                // If we can't send the ping message, break !
+                match tx.send(Ok(Message::ping(""))) {
+                    Ok(_) => info!("Ping sent (uid={})", my_id),
+                    Err(e) => {
+                        error!("Cannot send the ping (uid={}) due to: {}", my_id, e);
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     // user_ws_rx stream will keep processing as long as the user stays
