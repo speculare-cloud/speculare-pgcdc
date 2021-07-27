@@ -18,7 +18,7 @@ pub fn launch_broadcaster(mut rclient: ReplicationClient, tx: Sender<String>) {
         let options = &[("pretty-print", "0")];
 
         // Drop previous and create new replication slot
-        replication_utils::init_replication_slot(&mut rclient, &slot_name).await;
+        replication_utils::init_replication_slot(&mut rclient, slot_name).await;
 
         // Get info about the server (xlogpos, dbname, timeline, systemid)
         let identify_system = rclient.identify_system().await.unwrap();
