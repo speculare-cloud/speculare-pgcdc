@@ -1,7 +1,7 @@
 use crate::{
     utils::specific_filter::{DataType, SpecificFilter},
     websockets::{self, client::client_connected, ListQueryParams, ServerState, WsWatchFor},
-    CONFIG,
+    CONFIG, TABLES,
 };
 
 use std::{net::SocketAddr, sync::Arc};
@@ -15,6 +15,8 @@ use warp::{
 fn parse_ws_query(params: &ListQueryParams) -> Result<WsWatchFor, Response<Body>> {
     let mut parts = params.query.split(':');
     let mut change_flag = 0;
+
+    // Apply bit operation to the change_flag based on the query type
     match parts.next() {
         Some(val) => val
             .split(',')
@@ -26,21 +28,25 @@ fn parse_ws_query(params: &ListQueryParams) -> Result<WsWatchFor, Response<Body>
                 .into_response())
         }
     }
+
+    // If change_flag is 0, we have an error
     if change_flag == 0 {
         return Err(Response::builder()
             .status(StatusCode::BAD_REQUEST)
             .body("The change_type params does not match requirements.")
             .into_response());
     }
+
+    // Get the change_table and check if the table is valid
     let change_table = match parts.next() {
         Some(table) => {
             // Check if the table exists inside TABLES
-            // if !TABLES.read().unwrap().iter().any(|v| v == table) {
-            //     return Response::builder()
-            //         .status(StatusCode::BAD_REQUEST)
-            //         .body("The table asked for does not exists.")
-            //         .into_response();
-            // }
+            if !TABLES.read().unwrap().iter().any(|v| v == table) {
+                return Err(Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .body("The table asked for does not exists.")
+                    .into_response());
+            }
             table.to_owned()
         }
         None => {
@@ -50,6 +56,8 @@ fn parse_ws_query(params: &ListQueryParams) -> Result<WsWatchFor, Response<Body>
                 .into_response());
         }
     };
+
+    // Construct the SpecificFilter from the request
     let specific: Option<SpecificFilter> = if let Some(filter) = parts.next() {
         let mut fparts = filter.splitn(2, ".eq.");
         match (fparts.next(), fparts.next()) {
@@ -102,6 +110,7 @@ pub async fn run_server(server_state: Arc<ServerState>) {
             return;
         }
     };
+
     // Check if we should enable https
     let https = CONFIG.get_bool("HTTPS").unwrap_or(false);
     let serv = warp::serve(
@@ -110,6 +119,7 @@ pub async fn run_server(server_state: Arc<ServerState>) {
             .map(|| "zpour")
             .or(ws_handlers),
     );
+
     if https {
         let cert_path = CONFIG
             .get_str("KEY_CERT")

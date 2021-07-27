@@ -39,6 +39,7 @@ pub async fn connect_replica() -> ReplicationClient {
 pub async fn init_replication_slot(rclient: &mut ReplicationClient, slot_name: &str) {
     // Clean up previous replication slot (if any) named slot_name
     let resp = rclient.drop_replication_slot(slot_name, true).await;
+
     // Assert that the drop was done successfully
     assert!(
         resp.is_ok(),
@@ -53,6 +54,7 @@ pub async fn init_replication_slot(rclient: &mut ReplicationClient, slot_name: &
     let resp = rclient
         .create_logical_replication_slot(slot_name, true, plugin, no_export)
         .await;
+
     // Assert that the creation was done successfully
     assert!(
         resp.is_ok(),

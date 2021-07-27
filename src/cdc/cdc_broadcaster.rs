@@ -1,7 +1,7 @@
 use super::replication_utils;
 
 use futures::StreamExt;
-use postgres_protocol::message::backend::ReplicationMessage;
+use postgres_protocol::message::backend::ReplicationMessage::{PrimaryKeepAlive, XLogData};
 use std::time::{Duration, UNIX_EPOCH};
 use tokio::sync::broadcast::Sender;
 use tokio_postgres::replication_client::ReplicationClient;
@@ -41,15 +41,15 @@ pub fn launch_broadcaster(mut rclient: ReplicationClient, tx: Sender<String>) {
         // we send it and after that we recieve a reply of 0.
         // This mean we successfully sent our keepalive packet.
         let mut keepalive_sent_count: u8 = 0;
+
         // Listen for the replication stream
         while let Some(replication_message) = logical_stream.next().await {
             match replication_message {
-                Ok(ReplicationMessage::XLogData(xlog_data)) => {
+                Ok(XLogData(xlog_data)) => {
                     // Extracting the json data from the ReplicationMessage
                     // converting to a String because he need to live longer than this scope
                     let json = String::from_utf8(xlog_data.data().to_vec()).unwrap();
                     trace!("Json: {}", json);
-
                     // Send the JSON to dispatcher consumer using this solution for the queue of the mpmc
                     // This fail only if no receiver are waiting for the sender, in our case it's safe to assume
                     // that if tx.send() fail, we panic! because our program is fucked up at this point
@@ -57,13 +57,11 @@ pub fn launch_broadcaster(mut rclient: ReplicationClient, tx: Sender<String>) {
                         error!("Fatal error, can't send to the channel: {}", err);
                         std::process::exit(1);
                     }
-                    trace!("Json sent");
-
                     // Update the last_lsn as we've sent the info
                     last_lsn = xlog_data.wal_end().into();
                     trace!("Last_lsn == {}", last_lsn);
                 }
-                Ok(ReplicationMessage::PrimaryKeepAlive(keepalive)) => {
+                Ok(PrimaryKeepAlive(keepalive)) => {
                     // If the keepalive reply is 1, this means postgres is waiting for our reply
                     // before cutting off the connection
                     if keepalive.reply() == 1 {

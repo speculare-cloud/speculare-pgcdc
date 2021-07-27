@@ -76,10 +76,13 @@ pub async fn client_connected(
             .or_insert_with(HashSet::new)
             .insert(my_id);
     }
+
     // Construct the heartbeat interval, used to know when to send Ping to the client
     let mut hb_tick = tokio::time::interval(HEARTBEAT_INTERVAL);
+
     // When was the last time the server answered us with a Pong ?
     let mut hb_pong: Instant = Instant::now();
+
     // Return a `Future` that is basically a state machine managing
     // this specific user's connection.
     // Every time the client sends a message, do nothing
@@ -135,9 +138,9 @@ pub async fn client_connected(
 
 async fn user_disconnected(my_id: usize, server_state: &Arc<ServerState>, change_flag: u8) {
     info!("Client disconnected: {}", my_id);
-
     // Stream closed up, so remove from the user list
     server_state.clients.write().unwrap().remove(&my_id);
+
     if has_bit!(change_flag, INSERT) {
         // For each table entries, remove the id of the ws_session
         for list_sessions in server_state.inserts.write().unwrap().values_mut() {

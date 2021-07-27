@@ -83,6 +83,7 @@ async fn main() {
 
     // Construct our default server state
     let server_state = Arc::new(ServerState::default());
+
     // Clone a version of our server_state for broadcasting
     let cserver_state = server_state.clone();
 
@@ -108,7 +109,6 @@ async fn main() {
 
     // Init the replication slot and read the stream of change
     cdc::cdc_broadcaster::launch_broadcaster(rclient, tx);
-
     info!("Allowed tables are: {:?}", &TABLES.read().unwrap());
 
     // Start the Warp server
