@@ -14,9 +14,9 @@ use warp::{
 };
 
 /// How often heartbeat pings are sent
-const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
+const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(15);
 /// How long before lack of client response causes a timeout
-const CLIENT_TIMEOUT: Duration = Duration::from_secs(30);
+const CLIENT_TIMEOUT: Duration = Duration::from_secs(40);
 
 pub async fn client_connected(
     ws: WebSocket,

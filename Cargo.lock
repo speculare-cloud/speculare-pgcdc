@@ -139,9 +139,9 @@ dependencies = [
 
 [[package]]
 name = "crypto-mac"
-version = "0.10.1"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bff07008ec701e8028e2ceb8f83f0e4274ee62bd2dbdc4fefff2e9a91824081a"
+checksum = "b1d1a86f49236c215f271d40892d5fc950490551400b02ef360692c29815c714"
 dependencies = [
  "generic-array",
  "subtle",
@@ -396,9 +396,9 @@ dependencies = [
 
 [[package]]
 name = "hmac"
-version = "0.10.1"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1441c6b1e930e2817404b5046f1f989899143a12bf92de603b69f4e0aee1e15"
+checksum = "2a2a2320eb7ec0ebe8da8f744d7812d9fc4cb4d09344ac01898dbcb6a20ae69b"
 dependencies = [
  "crypto-mac",
  "digest",
@@ -461,7 +461,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.4.0",
+ "socket2",
  "tokio",
  "tower-service",
  "tracing",
@@ -734,18 +734,18 @@ checksum = "d4fd5641d01c8f18a23da7b6fe29298ff4b55afcccdf78973b24cf3175fee32e"
 
 [[package]]
 name = "phf"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3dfb61232e34fcb633f43d12c58f83c1df82962dcdfa565a4e866ffc17dafe12"
+checksum = "b2ac8b67553a7ca9457ce0e526948cad581819238f4a9d1ea74545851fa24f37"
 dependencies = [
  "phf_shared",
 ]
 
 [[package]]
 name = "phf_shared"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c00cf8b9eafe68dde5e9eaa2cef8ee84a9336a47d566ec55ca16589633b65af7"
+checksum = "a68318426de33640f02be62b4ae8eb1261be2efbc337b60c54d845bf4484e0d9"
 dependencies = [
  "siphasher",
 ]
@@ -784,8 +784,8 @@ checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
 name = "postgres-protocol"
-version = "0.6.0"
-source = "git+https://github.com/Martichou/rust-postgres?branch=replication#750bf1725fa856144c060bb24b4dedb6626d99c4"
+version = "0.6.1"
+source = "git+https://github.com/Martichou/rust-postgres?branch=copy-both#565770379607459ed987dfa73442d5c1c25ed214"
 dependencies = [
  "base64",
  "byteorder",
@@ -801,8 +801,8 @@ dependencies = [
 
 [[package]]
 name = "postgres-types"
-version = "0.2.0"
-source = "git+https://github.com/Martichou/rust-postgres?branch=replication#750bf1725fa856144c060bb24b4dedb6626d99c4"
+version = "0.2.1"
+source = "git+https://github.com/Martichou/rust-postgres?branch=copy-both#565770379607459ed987dfa73442d5c1c25ed214"
 dependencies = [
  "bytes",
  "fallible-iterator",
@@ -1129,17 +1129,6 @@ checksum = "fe0f37c9e8f3c5a4a66ad655a93c74daac4ad00c441533bf5c6e7990bb42604e"
 
 [[package]]
 name = "socket2"
-version = "0.3.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "122e570113d28d773067fab24266b66753f6ea915758651696b6e35e49f88d6e"
-dependencies = [
- "cfg-if",
- "libc",
- "winapi",
-]
-
-[[package]]
-name = "socket2"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e3dfc207c526015c632472a77be09cf1b6e46866581aecae5cc38fb4235dea2"
@@ -1152,13 +1141,15 @@ dependencies = [
 name = "speculare-pgcdc"
 version = "0.0.4"
 dependencies = [
+ "async-trait",
+ "byteorder",
+ "bytes",
  "config",
  "env_logger",
  "futures",
  "lazy_static",
  "log",
  "postgres-protocol",
- "rand",
  "serde 1.0.126",
  "serde_json",
  "simd-json",
@@ -1308,8 +1299,8 @@ dependencies = [
 
 [[package]]
 name = "tokio-postgres"
-version = "0.7.0"
-source = "git+https://github.com/Martichou/rust-postgres?branch=replication#750bf1725fa856144c060bb24b4dedb6626d99c4"
+version = "0.7.2"
+source = "git+https://github.com/Martichou/rust-postgres?branch=copy-both#565770379607459ed987dfa73442d5c1c25ed214"
 dependencies = [
  "async-trait",
  "byteorder",
@@ -1320,10 +1311,10 @@ dependencies = [
  "parking_lot",
  "percent-encoding",
  "phf",
- "pin-project",
+ "pin-project-lite",
  "postgres-protocol",
  "postgres-types",
- "socket2 0.3.19",
+ "socket2",
  "tokio",
  "tokio-util",
 ]

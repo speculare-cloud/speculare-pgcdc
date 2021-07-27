@@ -8,8 +8,8 @@ use std::{
     sync::{atomic::AtomicUsize, Arc, RwLock},
 };
 
-pub mod cdc_transmitter;
 pub mod client;
+pub mod forwarder;
 
 pub const INSERT: u8 = 1 << 1;
 pub const UPDATE: u8 = 1 << 2;

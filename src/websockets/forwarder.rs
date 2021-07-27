@@ -3,7 +3,7 @@ use crate::{websockets, TABLES_BY_INDEX};
 
 use serde_json::Value;
 use std::{collections::HashSet, sync::Arc};
-use tokio::sync::broadcast::Sender;
+use tokio::sync::mpsc::Receiver;
 use warp::ws::Message;
 
 /// Get the table name from an &str, returning a String
@@ -64,25 +64,11 @@ fn send_message(
     }
 }
 
-/// Start a new task which loop over the broadcast's value it may send and dispatch them to websocket.
-pub fn launch_broadcaster(tx: Sender<String>, server_state: Arc<ServerState>) {
-    // Create the Receiver for the broadcast
-    let mut rx = tx.subscribe();
-    // Spawn the task handling the rest
+/// Start a new task which loop over the Receiver's value it may get and forward them to websockets.
+pub fn start_forwarder(mut rx: Receiver<String>, server_state: Arc<ServerState>) {
     tokio::spawn(async move {
-        info!("Successfully started the WsDispatcher");
-        loop {
-            // Wait until we recv the data
-            let mut value = match rx.recv().await {
-                Ok(val) => {
-                    trace!("Dispatcher task got: {}", val);
-                    val
-                }
-                Err(e) => {
-                    error!("Task just got an error: {}", e);
-                    continue;
-                }
-            };
+        trace!("Forwarder: Started and waiting for a message");
+        while let Some(mut value) = rx.recv().await {
             // Convert the data to a Value enum of serde_json
             // Using simd optimization through simd_json crate.
             let data: Value = simd_json::from_str(&mut value).unwrap();
