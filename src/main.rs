@@ -78,7 +78,7 @@ async fn main() {
     configure_logger(
         CONFIG
             .get_str("RUST_LOG")
-            .unwrap_or_else(|_| "error".into()),
+            .unwrap_or_else(|_| "error,wrap=info".into()),
     );
 
     // Form replication connection & keep the connection open
