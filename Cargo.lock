@@ -191,6 +191,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
+name = "foreign-types"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f6f339eb8adc052cd2ca78910fda869aefa38d22d5cb648e6485e4d3fc06f3b1"
+dependencies = [
+ "foreign-types-shared",
+]
+
+[[package]]
+name = "foreign-types-shared"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
+
+[[package]]
 name = "form_urlencoded"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -702,6 +717,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
+name = "openssl"
+version = "0.10.35"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "549430950c79ae24e6d02e0b7404534ecf311d94cc9f861e9e4020187d13d885"
+dependencies = [
+ "bitflags",
+ "cfg-if",
+ "foreign-types",
+ "libc",
+ "once_cell",
+ "openssl-sys",
+]
+
+[[package]]
+name = "openssl-sys"
+version = "0.9.65"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a7907e3bfa08bb85105209cdfcb6c63d109f8f6c1ed6ca318fff5c1853fbc1d"
+dependencies = [
+ "autocfg",
+ "cc",
+ "libc",
+ "pkg-config",
+ "vcpkg",
+]
+
+[[package]]
 name = "parking_lot"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -783,9 +825,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
+name = "pkg-config"
+version = "0.3.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3831453b3449ceb48b6d9c7ad7c96d5ea673e9b470a1dc578c2ce6521230884c"
+
+[[package]]
+name = "postgres-openssl"
+version = "0.5.0"
+source = "git+https://github.com/Martichou/rust-postgres?branch=copy-both#4f598bb5b68c730d19c70f6d033e63e386542cfa"
+dependencies = [
+ "futures",
+ "openssl",
+ "tokio",
+ "tokio-openssl",
+ "tokio-postgres",
+]
+
+[[package]]
 name = "postgres-protocol"
 version = "0.6.1"
-source = "git+https://github.com/Martichou/rust-postgres?branch=copy-both#565770379607459ed987dfa73442d5c1c25ed214"
+source = "git+https://github.com/Martichou/rust-postgres?branch=copy-both#4f598bb5b68c730d19c70f6d033e63e386542cfa"
 dependencies = [
  "base64",
  "byteorder",
@@ -802,7 +862,7 @@ dependencies = [
 [[package]]
 name = "postgres-types"
 version = "0.2.1"
-source = "git+https://github.com/Martichou/rust-postgres?branch=copy-both#565770379607459ed987dfa73442d5c1c25ed214"
+source = "git+https://github.com/Martichou/rust-postgres?branch=copy-both#4f598bb5b68c730d19c70f6d033e63e386542cfa"
 dependencies = [
  "bytes",
  "fallible-iterator",
@@ -1149,6 +1209,8 @@ dependencies = [
  "futures",
  "lazy_static",
  "log",
+ "openssl",
+ "postgres-openssl",
  "postgres-protocol",
  "serde 1.0.126",
  "serde_json",
@@ -1298,9 +1360,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio-openssl"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f24cddc8445a4dc8359cdd9e91c19d544fc95f672e32afe8945852b9381a09fe"
+dependencies = [
+ "futures",
+ "openssl",
+ "openssl-sys",
+ "tokio",
+]
+
+[[package]]
 name = "tokio-postgres"
 version = "0.7.2"
-source = "git+https://github.com/Martichou/rust-postgres?branch=copy-both#565770379607459ed987dfa73442d5c1c25ed214"
+source = "git+https://github.com/Martichou/rust-postgres?branch=copy-both#4f598bb5b68c730d19c70f6d033e63e386542cfa"
 dependencies = [
  "async-trait",
  "byteorder",
@@ -1512,6 +1586,12 @@ dependencies = [
  "itoa",
  "ryu",
 ]
+
+[[package]]
+name = "vcpkg"
+version = "0.2.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "version_check"

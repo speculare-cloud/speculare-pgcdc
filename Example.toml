@@ -1,4 +1,8 @@
-CONNINFO = "host=localhost user=postgres dbname=pgcdc password=password"
+POSTGRES_HOST = "127.0.0.1"
+POSTGRES_USER = "postgres"
+POSTGRES_PASSWORD = "azertyuiop"
+POSTGRES_DATABASE = "speculare"
+POSTGRES_TLS = false			# default = true
 
 BINDING = "0.0.0.0:8080"
 
@@ -6,4 +10,4 @@ KEY_PRIV = "key.pem"			# (optional)
 KEY_CERT = "cert.pem"			# (optional)
 HTTPS = true					# (optional [default = false])
 
-RUST_LOG = "info,speculare_pgcdc=trace,actix_server=info,actix_web=info"	# (optional)
+RUST_LOG = "warn,speculare_pgcdc=info,warp=info"	# (optional)
