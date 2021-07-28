@@ -2,6 +2,7 @@ use byteorder::{BigEndian, ReadBytesExt};
 use bytes::{BufMut, Bytes, BytesMut};
 use futures::{SinkExt, StreamExt};
 use std::{
+    io::{Cursor, Read},
     pin::Pin,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -14,39 +15,6 @@ const PRIMARY_KEEPALIVE_TAG: u8 = b'k';
 
 lazy_static::lazy_static! {
     static ref EPOCH: SystemTime = UNIX_EPOCH + Duration::from_secs(TIME_SEC_CONVERSION);
-}
-
-struct Buffer {
-    bytes: bytes::Bytes,
-    idx: usize,
-}
-
-impl Buffer {
-    #[inline]
-    fn slice(&self) -> &[u8] {
-        &self.bytes[self.idx..]
-    }
-
-    #[inline]
-    fn read_all(&mut self) -> bytes::Bytes {
-        let buf = self.bytes.slice(self.idx..);
-        self.idx = self.bytes.len();
-        buf
-    }
-}
-
-impl std::io::Read for Buffer {
-    #[inline]
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let len = {
-            let slice = self.slice();
-            let len = std::cmp::min(slice.len(), buf.len());
-            buf[..len].copy_from_slice(&slice[..len]);
-            len
-        };
-        self.idx += len;
-        Ok(len)
-    }
 }
 
 #[inline]
@@ -106,7 +74,8 @@ pub async fn replication_stream_poll(duplex_stream: CopyBothDuplex<Bytes>, tx: S
     while let Some(data) = boxed.next().await {
         match data {
             Ok(bytes) => {
-                let mut buf = Buffer { bytes, idx: 0 };
+                let mut buf = Cursor::new(bytes);
+                //let mut buf = Buffer { bytes, idx: 0 };
                 let tag = buf.read_u8().unwrap();
 
                 match tag {
@@ -123,7 +92,7 @@ pub async fn replication_stream_poll(duplex_stream: CopyBothDuplex<Bytes>, tx: S
                 }
             }
             Err(e) => {
-                dbg!(e);
+                error!("Replication: {}", e);
             }
         }
     }
@@ -136,20 +105,31 @@ pub async fn replication_stream_poll(duplex_stream: CopyBothDuplex<Bytes>, tx: S
 /// - u64: The server's system clock at the time of transmission, as microseconds
 ///        since midnight on 2000-01-01.
 /// - Byte(n): The output from the logical replication output plugin.
-async fn parse_xlogdata_message(buf: &mut Buffer, sync_lsn: &mut u64, tx: &Sender<String>) {
+async fn parse_xlogdata_message(buf: &mut Cursor<Bytes>, sync_lsn: &mut u64, tx: &Sender<String>) {
     let wal_pos = buf.read_u64::<BigEndian>().unwrap();
     let _wal_end = buf.read_u64::<BigEndian>();
     let _ts = buf.read_u64::<BigEndian>();
 
     trace!("XLogData: wal_pos {}/{:X}", wal_pos >> 32, wal_pos);
 
-    let data = String::from_utf8(buf.read_all().to_vec()).unwrap();
+    let mut data: String = String::with_capacity(32);
+    match buf.read_to_string(&mut data) {
+        Ok(size) => {
+            if size == 0 {
+                return;
+            }
+        }
+        Err(e) => {
+            error!("XLogData: cannot read_to_string: {}", e);
+            return;
+        }
+    };
     // Broadcast data to the transmitter
     // send can fail if the other half of the channel is closed, either due to close
     // or because the Receiver has been dropped. In addition send will also block until
     // there is a room for the message into the queue.
     if let Err(e) = tx.send(data).await {
-        error!("XLogData: Can't send to the channel due to: {}", e);
+        error!("XLogData: can't send to the channel due to: {}", e);
         std::process::exit(1);
     }
 
@@ -166,7 +146,7 @@ async fn parse_xlogdata_message(buf: &mut Buffer, sync_lsn: &mut u64, tx: &Sende
 ///       to avoid a timeout disconnect. 0 otherwise.
 async fn parse_keepalive_message(
     conn: &mut Pin<Box<CopyBothDuplex<Bytes>>>,
-    buf: &mut Buffer,
+    buf: &mut Cursor<Bytes>,
     sync_lsn: &mut u64,
 ) {
     let wal_pos = buf.read_u64::<BigEndian>().unwrap();
