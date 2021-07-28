@@ -8,18 +8,23 @@ macro_rules! has_bit {
 }
 
 mod cdc;
-mod handlers;
 mod server;
 mod utils;
 mod websockets;
 
-use actix::Actor;
+use crate::websockets::{forwarder::start_forwarder, ServerState};
+
+use cdc::{
+    connection::db_client_start,
+    replication::{replication_slot_create, replication_stream_poll, replication_stream_start},
+    ExtConfig,
+};
 use config::Config;
-use std::collections::HashMap;
-use std::sync::RwLock;
-use tokio::sync::broadcast;
-use tokio_postgres::SimpleQueryMessage;
-use websockets::{cdc_transmitter, server::ws_server::WsServer};
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
+use tokio::sync::mpsc;
 
 // Static array to hold the tables in the order of creation in the database.
 // As we use TimescaleDB, each table get partitioned using a patern like "_hyper_x_y_chunk",
@@ -67,54 +72,36 @@ fn configure_logger(level: String) {
     env_logger::init();
 }
 
-#[actix_web::main]
-async fn main() -> std::io::Result<()> {
+#[tokio::main]
+async fn main() {
     // Init the logger and set the debug level correctly
     configure_logger(
         CONFIG
             .get_str("RUST_LOG")
-            .unwrap_or_else(|_| "error,actix_server=info,actix_web=error".into()),
+            .unwrap_or_else(|_| "error".into()),
     );
 
     // Form replication connection & keep the connection open
-    let rclient = cdc::replication_utils::connect_replica().await;
+    let client = db_client_start().await;
 
-    // A multi-producer, multi-consumer broadcast queue. Each sent value is seen by all consumers.
-    // 16 is the number of messages that can be queued up before older messages get dropped.
-    let (tx, _) = broadcast::channel(16);
+    client.populate_tables().await;
+    trace!("Main: Allowed tables are: {:?}", &TABLES.read().unwrap());
 
-    // Start WsServer actor
-    let ws_server = WsServer::new().start();
-    info!("Successfully started WsServer");
+    // A multi-producer, single-consumer channel queue. Using 124 buffers lenght.
+    let (tx, rx) = mpsc::channel(124);
 
-    // Clone the Sender of the broadcast to allow it to be used in two async context
-    // Init the ws_dispatcher before init_cdc_listener because the latter will fail if no subscriber are waiting
-    cdc_transmitter::launch_broadcaster(ws_server.clone(), tx.clone());
+    // Construct our default server state
+    let server_state = Arc::new(ServerState::default());
 
-    // Get all tables contained in the Database
-    let query = "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';";
-    rclient
-        .simple_query(&query)
-        .await
-        .unwrap()
-        .into_iter()
-        .for_each(|msg| {
-            // And push them to the TABLES Vec
-            if let SimpleQueryMessage::Row(row) = msg {
-                if let Some(val) = row.get(0) {
-                    TABLES.write().unwrap().push(val.to_owned())
-                }
-            }
-        });
+    // Start listening to the Sender & forward message when receiving one
+    start_forwarder(rx, server_state.clone());
 
-    // Init the replication slot and read the stream of change
-    cdc::cdc_broadcaster::launch_broadcaster(rclient, tx);
+    // Init the replication slot and listen to the duplex_stream
+    tokio::spawn(async move {
+        let lsn = replication_slot_create(&client).await;
+        let duplex_stream = replication_stream_start(&client, &lsn).await;
+        replication_stream_poll(duplex_stream, tx).await;
+    });
 
-    info!("Allowed tables are: {:?}", &TABLES.read().unwrap());
-
-    // Start the Actix server and so the websocket client
-    server::server(ws_server).await?;
-
-    // Return Ok
-    Ok(())
+    server::run_server(server_state).await
 }
