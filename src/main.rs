@@ -85,7 +85,7 @@ async fn main() {
     let client = db_client_start().await;
 
     client.populate_tables().await;
-    trace!("Allowed tables are: {:?}", &TABLES.read().unwrap());
+    trace!("Main: Allowed tables are: {:?}", &TABLES.read().unwrap());
 
     // A multi-producer, single-consumer channel queue. Using 124 buffers lenght.
     let (tx, rx) = mpsc::channel(124);

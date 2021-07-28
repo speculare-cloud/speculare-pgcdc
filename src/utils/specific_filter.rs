@@ -15,7 +15,13 @@ impl SpecificFilter {
     /// Determine if the filter match the message passed as parameter
     pub fn match_filter(&self, message: &serde_json::Value) -> bool {
         // Determine if the column is present in this change
-        let columns = message["columnnames"].as_array().unwrap();
+        let columns = match message["columnnames"].as_array() {
+            Some(val) => val,
+            None => {
+                error!("Specific: the message does not contains `columnnames`");
+                return false;
+            }
+        };
         // Check if the cloumns we asked for exist in this data change
         let value_index = columns.iter().position(|c| c == &self.column);
         if value_index.is_none() {

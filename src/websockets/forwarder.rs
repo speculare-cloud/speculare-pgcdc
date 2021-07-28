@@ -16,7 +16,10 @@ fn get_table_name(table_name: &str) -> String {
         let idx = match parts.nth(2) {
             Some(val) => val.parse::<i8>().unwrap() - 1,
             None => {
-                error!("Table {} cannot be deconstructed into an idx", table_name);
+                error!(
+                    "Match table: table {} cannot be deconstructed into an idx",
+                    table_name
+                );
                 return table_name.to_owned();
             }
         };
@@ -25,7 +28,10 @@ fn get_table_name(table_name: &str) -> String {
         match TABLES_BY_INDEX.read().unwrap().get(&(idx as usize)) {
             Some(val) => return val.to_owned(),
             None => {
-                error!("Table not found inside using index: {}:{}", idx, table_name,);
+                error!(
+                    "Match table: table not found inside using index: {}:{}",
+                    idx, table_name,
+                );
                 return table_name.to_owned();
             }
         }
@@ -57,7 +63,7 @@ fn send_message(
                 // Send the message to the client
                 if let Err(_disconnected) = client.gate.send(Ok(Message::text(message.to_string())))
                 {
-                    error!("Client disconnected, should be dropped soon");
+                    error!("Send_message: client disconnected, should be removed soon");
                 }
             }
         }
@@ -76,7 +82,7 @@ pub fn start_forwarder(mut rx: Receiver<String>, server_state: Arc<ServerState>)
             let changes = match data["change"].as_array() {
                 Some(val) => val,
                 None => {
-                    error!("The message we got doesn't contains a change: {}", data);
+                    error!("Forwarder: The message is invalid: {}", data);
                     continue;
                 }
             };
@@ -111,12 +117,12 @@ pub fn start_forwarder(mut rx: Receiver<String>, server_state: Arc<ServerState>)
                         let sessions = lock.get(&table_name);
                         send_message(change, sessions, &server_state);
                     } else {
-                        error!("Change {:?} not handled (yet).", change_flag);
+                        error!("Forwarder: change_flag {:?} not handled.", change_flag);
                         continue;
                     };
                 } else {
                     error!(
-                        "Table ({:?}) or change_type ({:?}) not present.",
+                        "Forwarder: table ({:?}) or change_type ({:?}) not present.",
                         change["table"], change["kind"]
                     );
                 }

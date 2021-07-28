@@ -25,7 +25,7 @@ pub async fn client_connected(
 ) {
     // Use a counter to assign a new unique ID for this user.
     let my_id = NEXT_CLIENT_ID.fetch_add(1, Ordering::Relaxed);
-    info!("Client connected: {}", my_id);
+    info!("Websocket: client connected: {}", my_id);
 
     // Split the socket into a sender and receive of messages.
     let (user_ws_tx, mut user_ws_rx) = ws.split();
@@ -35,7 +35,7 @@ pub async fn client_connected(
     let rx = UnboundedReceiverStream::new(rx);
     tokio::task::spawn(rx.forward(user_ws_tx).map(|result| {
         if let Err(e) = result {
-            error!("websocket send error for: {}", e);
+            error!("Websocket: send error for: {}", e);
         }
     }));
 
@@ -96,19 +96,19 @@ pub async fn client_connected(
                         match msg {
                             // If the client sent us a pong message
                             e if e.is_pong() => {
-                                info!("Pong receive (uid={})", my_id);
+                                trace!("Websocket: pong receive (uid={})", my_id);
                                 hb_pong = Instant::now();
                             },
                             // If the client send us a close message
                             e if e.is_close() => {
-                                info!("Websocket closed (uid={})", my_id);
+                                info!("Websocket: client closed (uid={})", my_id);
                                 break;
                             },
                             _ => {}
                         }
                     },
                     Err(e) => {
-                        error!("Websocket error (uid={}): {}", my_id, e);
+                        error!("Websocket: error (uid={}): {}", my_id, e);
                         break;
                     }
                 }
@@ -121,9 +121,9 @@ pub async fn client_connected(
                 }
                 // If we can't send the ping message, break !
                 match tx.send(Ok(Message::ping(""))) {
-                    Ok(_) => info!("Ping sent (uid={})", my_id),
+                    Ok(_) => trace!("Websocket: ping sent (uid={})", my_id),
                     Err(e) => {
-                        error!("Cannot send the ping (uid={}) due to: {}", my_id, e);
+                        error!("Websocket: cannot send the ping (uid={}) due to: {}", my_id, e);
                         break;
                     }
                 }
@@ -137,7 +137,7 @@ pub async fn client_connected(
 }
 
 async fn user_disconnected(my_id: usize, server_state: &Arc<ServerState>, change_flag: u8) {
-    info!("Client disconnected: {}", my_id);
+    info!("Websocket: client disconnected: {}", my_id);
     // Stream closed up, so remove from the user list
     server_state.clients.write().unwrap().remove(&my_id);
 

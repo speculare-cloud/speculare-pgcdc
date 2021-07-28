@@ -117,7 +117,7 @@ pub async fn replication_stream_poll(duplex_stream: CopyBothDuplex<Bytes>, tx: S
                         parse_keepalive_message(&mut boxed, &mut buf, &mut sync_lsn).await;
                     }
                     tag => {
-                        error!("Unknown streaming message type: `{}`", tag);
+                        error!("Replication: Unknown streaming message type: `{}`", tag);
                         continue;
                     }
                 }
