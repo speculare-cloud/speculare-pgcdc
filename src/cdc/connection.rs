@@ -21,7 +21,7 @@ pub async fn db_client_start() -> Client {
         CONFIG
             .get_str("POSTGRES_PASSWORD")
             .expect("Missing POSTGRES_PASSWORD inside the config"),
-        if tls { "require" } else { "allow" }
+        if tls { "require" } else { "disable" }
     );
 
     // TODO - Avoid all the duplicated code - Maybe using a macro ?
