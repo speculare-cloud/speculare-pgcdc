@@ -84,7 +84,7 @@ async fn main() {
     // Form replication connection & keep the connection open
     let client = db_client_start().await;
 
-    client.populate_tables().await;
+    client.detect_tables().await;
     trace!("Main: Allowed tables are: {:?}", &TABLES.read().unwrap());
 
     // A multi-producer, single-consumer channel queue. Using 124 buffers lenght.
