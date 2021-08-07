@@ -30,9 +30,11 @@ pub fn current_time() -> u64 {
 /// 2. "consistent_point": LSN at which we became consistent
 /// 3. "snapshot_name": exported snapshot's name
 /// 4. "output_plugin": name of the output plugin, as requested
-pub async fn replication_slot_create(client: &Client) -> String {
-    let slot_query =
-        "CREATE_REPLICATION_SLOT pgcdc_repl TEMPORARY LOGICAL wal2json NOEXPORT_SNAPSHOT";
+pub async fn replication_slot_create(client: &Client, slot_name: &str) -> String {
+    let slot_query = &format!(
+        "CREATE_REPLICATION_SLOT {} TEMPORARY LOGICAL wal2json NOEXPORT_SNAPSHOT",
+        slot_name
+    );
 
     let resp: Vec<SimpleQueryRow> = client
         .simple_query(slot_query)
@@ -47,21 +49,33 @@ pub async fn replication_slot_create(client: &Client) -> String {
 
     let lsn = resp[0].get("consistent_point").unwrap().to_owned();
 
-    trace!("Replication: slot created and got lsn {}", lsn);
+    trace!(
+        "Replication: slot {} created and got lsn {}",
+        slot_name,
+        lsn
+    );
 
     lsn
 }
 
 /// Starts streaming logical changes from replication slot pgcdc_repl,
 /// starting from position start_lsn.
-pub async fn replication_stream_start(client: &Client, start_lsn: &str) -> CopyBothDuplex<Bytes> {
-    let repl_query = format!("START_REPLICATION SLOT pgcdc_repl LOGICAL {}", start_lsn);
+pub async fn replication_stream_start(
+    client: &Client,
+    slot_name: &str,
+    start_lsn: &str,
+) -> CopyBothDuplex<Bytes> {
+    let repl_query = format!("START_REPLICATION SLOT {} LOGICAL {}", slot_name, start_lsn);
     let duplex_stream = client
         .copy_both_simple::<bytes::Bytes>(&repl_query)
         .await
         .unwrap();
 
-    trace!("Replication: started successfully from lsn {}", start_lsn);
+    trace!(
+        "Replication: started successfully using slot {} from lsn {}",
+        slot_name,
+        start_lsn
+    );
 
     duplex_stream
 }

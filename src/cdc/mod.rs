@@ -16,7 +16,7 @@ impl ExtConfig for Client {
     /// Fill the global TABLES Vec with the tables available inside the database
     async fn detect_tables(&self) {
         let query = "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';";
-        self.simple_query(&query)
+        self.simple_query(query)
             .await
             .unwrap()
             .into_iter()

@@ -23,6 +23,7 @@ simd-json = "0.4"
 tokio-postgres = { git = "https://github.com/Martichou/rust-postgres", branch = "copy-both" }
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
+uuid-readable-rs = { git = "https://github.com/Martichou/uuid-readable-rs" }
 warp = { git = "https://github.com/seanmonstar/warp", features = ["tls"], rev = "985587a" }
 
 [profile.release]
