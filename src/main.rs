@@ -98,7 +98,7 @@ async fn main() {
 
     // Init the replication slot and listen to the duplex_stream
     tokio::spawn(async move {
-        let slot_name = uuid_readable_rs::generate();
+        let slot_name = uuid_readable_rs::short().replace(' ', "_").to_lowercase();
         let lsn = replication_slot_create(&client, &slot_name).await;
         let duplex_stream = replication_stream_start(&client, &slot_name, &lsn).await;
         replication_stream_poll(duplex_stream, tx).await;
