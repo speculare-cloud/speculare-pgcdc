@@ -2,8 +2,8 @@ use crate::websockets::SessionInfo;
 
 use super::{ServerState, WsWatchFor, DELETE, INSERT, NEXT_CLIENT_ID, UPDATE};
 
+use ahash::AHashSet;
 use futures::{FutureExt, StreamExt};
-use std::collections::HashSet;
 use std::sync::{atomic::Ordering, Arc};
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
@@ -55,7 +55,7 @@ pub async fn client_connected(
             .write()
             .unwrap()
             .entry(watch_for.change_table.to_owned())
-            .or_insert_with(HashSet::new)
+            .or_insert_with(AHashSet::new)
             .insert(my_id);
     }
     if has_bit!(watch_for.change_flag, UPDATE) {
@@ -64,7 +64,7 @@ pub async fn client_connected(
             .write()
             .unwrap()
             .entry(watch_for.change_table.to_owned())
-            .or_insert_with(HashSet::new)
+            .or_insert_with(AHashSet::new)
             .insert(my_id);
     }
     if has_bit!(watch_for.change_flag, DELETE) {
@@ -73,7 +73,7 @@ pub async fn client_connected(
             .write()
             .unwrap()
             .entry(watch_for.change_table)
-            .or_insert_with(HashSet::new)
+            .or_insert_with(AHashSet::new)
             .insert(my_id);
     }
 

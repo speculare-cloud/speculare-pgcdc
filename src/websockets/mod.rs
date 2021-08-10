@@ -1,12 +1,9 @@
-use tokio::sync::mpsc;
-use warp::ws::Message;
-
 use crate::utils::specific_filter::SpecificFilter;
 
-use std::{
-    collections::{HashMap, HashSet},
-    sync::{atomic::AtomicUsize, Arc, RwLock},
-};
+use ahash::{AHashMap, AHashSet};
+use std::sync::{atomic::AtomicUsize, Arc, RwLock};
+use tokio::sync::mpsc;
+use warp::ws::Message;
 
 pub mod client;
 pub mod forwarder;
@@ -27,13 +24,13 @@ pub struct SessionInfo {
 ///
 /// - Key is their id
 /// - Value is a sender of `warp::ws::Message`
-type Clients = Arc<RwLock<HashMap<usize, SessionInfo>>>;
+type Clients = Arc<RwLock<AHashMap<usize, SessionInfo>>>;
 
 /// Our state of currently connected clients listening for a particular table.
 ///
 /// - Key is the table name
-/// - Value is a HashSet containing all the client's id listening to that table.
-type TypeList = Arc<RwLock<HashMap<String, HashSet<usize>>>>;
+/// - Value is a AHashSet containing all the client's id listening to that table.
+type TypeList = Arc<RwLock<AHashMap<String, AHashSet<usize>>>>;
 
 /// Contains info for what does the Ws is listening to
 #[derive(Clone)]

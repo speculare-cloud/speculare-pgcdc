@@ -14,30 +14,28 @@ mod websockets;
 
 use crate::websockets::{forwarder::start_forwarder, ServerState};
 
+use ahash::AHashMap;
 use cdc::{
     connection::db_client_start,
     replication::{replication_slot_create, replication_stream_poll, replication_stream_start},
     ExtConfig,
 };
 use config::Config;
-use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock},
-};
+use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
 
 // Static array to hold the tables in the order of creation in the database.
-// As we use TimescaleDB, each table get partitioned using a patern like "_hyper_x_y_chunk",
+// As we use TimescaleDB, each table get partitioned using a pattern like "_hyper_x_y_chunk",
 // which don't give us the opportunity to detect which table is being updated/inserted.
 // As the client will connect to the WS using the base table name, this array is used for lookup.
-// The patern always follow the same naming convention: "_hyper_(table_creation_order_from_1)_(partition_number)_chunk".
-// So we use this array to derive the name of the table from the patern naming chunk.
+// The pattern always follow the same naming convention: "_hyper_(table_creation_order_from_1)_(partition_number)_chunk".
+// So we use this array to derive the name of the table from the pattern naming chunk.
 lazy_static::lazy_static! {
     static ref TABLES: RwLock<Vec<String>> = {
         RwLock::new(Vec::new())
     };
 
-    static ref TABLES_BY_INDEX: RwLock<HashMap<usize, String>> = {
+    static ref TABLES_BY_INDEX: RwLock<AHashMap<usize, String>> = {
         RwLock::new([
             (0, "disks".into()),
             (1, "cputimes".into()),
@@ -87,8 +85,8 @@ async fn main() {
     client.detect_tables().await;
     trace!("Main: Allowed tables are: {:?}", &TABLES.read().unwrap());
 
-    // A multi-producer, single-consumer channel queue. Using 124 buffers lenght.
-    let (tx, rx) = mpsc::channel(124);
+    // A multi-producer, single-consumer channel queue. Using 128 buffers length.
+    let (tx, rx) = mpsc::channel(128);
 
     // Construct our default server state
     let server_state = Arc::new(ServerState::default());

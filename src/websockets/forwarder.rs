@@ -1,8 +1,9 @@
 use super::{ServerState, DELETE, INSERT, UPDATE};
 use crate::{websockets, TABLES_BY_INDEX};
 
+use ahash::AHashSet;
 use serde_json::Value;
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::mpsc::Receiver;
 use warp::ws::Message;
 
@@ -42,7 +43,7 @@ fn get_table_name(table_name: &str) -> String {
 /// Send a message to a specific group of sessions (insert, update or delete)
 fn send_message(
     message: &serde_json::Value,
-    sessions: Option<&HashSet<usize>>,
+    sessions: Option<&AHashSet<usize>>,
     server_state: &Arc<ServerState>,
 ) {
     // If no session were defined, skip
@@ -106,7 +107,7 @@ pub fn start_forwarder(mut rx: Receiver<String>, server_state: Arc<ServerState>)
                         let lock = server_state.inserts.read().unwrap();
                         // Then get the sessions out of it
                         let sessions = lock.get(&table_name);
-                        // And finally send the message to each client inside that sessions HashSet
+                        // And finally send the message to each client inside that sessions AHashSet
                         send_message(change, sessions, &server_state);
                     } else if has_bit!(change_flag, UPDATE) {
                         let lock = server_state.updates.read().unwrap();
