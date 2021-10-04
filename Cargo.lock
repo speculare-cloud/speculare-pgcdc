@@ -1650,7 +1650,7 @@ dependencies = [
 [[package]]
 name = "warp"
 version = "0.3.1"
-source = "git+https://github.com/seanmonstar/warp?rev=985587a#985587a530fe86c95a36014677ab641f1151aadf"
+source = "git+https://github.com/seanmonstar/warp?rev=9e74ff#9e74ff98e0f314879c29cf761a372840606bd585"
 dependencies = [
  "bytes",
  "futures",

@@ -170,7 +170,7 @@ async fn parse_keepalive_message(
     // Not 100% sure whether it's semantically correct to update our LSN position here --
     // the keepalive message indicates the latest position on the server, which might not
     // necessarily correspond to the latest position on the client. But this is what
-    // pg_recvlogical does, so it's probably ok. */
+    // pg_recvlogical does, so it's probably ok.
     *sync_lsn = std::cmp::max(wal_pos, *sync_lsn);
 
     trace!(
