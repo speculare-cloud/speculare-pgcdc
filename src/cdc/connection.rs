@@ -8,7 +8,7 @@ use tokio_postgres::{Client, NoTls};
 pub async fn db_client_start() -> Client {
     let tls = CONFIG.get_bool("POSTGRES_TLS").unwrap_or(true);
     let conn_string = format!(
-        "host={} user={} dbname={} replication=database password={} sslmode={}",
+        "host={} user={} dbname={} replication=database password={} sslmode={} connect_timeout=10",
         CONFIG
             .get_str("POSTGRES_HOST")
             .expect("Missing POSTGRES_HOST inside the config"),
