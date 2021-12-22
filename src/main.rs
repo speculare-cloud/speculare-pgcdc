@@ -63,7 +63,7 @@ lazy_static::lazy_static! {
             );
             std::process::exit(1);
         }
-        
+
         let mut config = Config::default();
         config.merge(config::File::with_name(&args[1])).unwrap();
         config
