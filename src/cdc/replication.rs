@@ -36,16 +36,23 @@ pub async fn replication_slot_create(client: &Client, slot_name: &str) -> String
         slot_name
     );
 
-    let resp: Vec<SimpleQueryRow> = client
-        .simple_query(slot_query)
-        .await
-        .unwrap()
-        .into_iter()
-        .filter_map(|data| match data {
-            SimpleQueryMessage::Row(row) => Some(row),
-            _ => None,
-        })
-        .collect();
+    let query_result = client.simple_query(slot_query).await;
+    let resp: Vec<SimpleQueryRow> = match query_result {
+        Ok(result) => result
+            .into_iter()
+            .filter_map(|data| match data {
+                SimpleQueryMessage::Row(row) => Some(row),
+                _ => None,
+            })
+            .collect(),
+        Err(e) => {
+            error!(
+                "Replication: '{}' cannot get the consistent_point: {}",
+                slot_name, e
+            );
+            std::process::exit(1);
+        }
+    };
 
     let lsn = resp[0].get("consistent_point").unwrap().to_owned();
 
@@ -66,10 +73,14 @@ pub async fn replication_stream_start(
     start_lsn: &str,
 ) -> CopyBothDuplex<Bytes> {
     let repl_query = format!("START_REPLICATION SLOT {} LOGICAL {}", slot_name, start_lsn);
-    let duplex_stream = client
-        .copy_both_simple::<bytes::Bytes>(&repl_query)
-        .await
-        .unwrap();
+    let copy_both_result = client.copy_both_simple::<bytes::Bytes>(&repl_query).await;
+    let duplex_stream = match copy_both_result {
+        Ok(result) => result,
+        Err(e) => {
+            error!("Replication: cannot get the a CopyBothDuplex: {}", e);
+            std::process::exit(1);
+        }
+    };
 
     trace!(
         "Replication: started successfully using slot {} from lsn {}",
@@ -89,7 +100,6 @@ pub async fn replication_stream_poll(duplex_stream: CopyBothDuplex<Bytes>, tx: S
         match data {
             Ok(bytes) => {
                 let mut buf = Cursor::new(bytes);
-                //let mut buf = Buffer { bytes, idx: 0 };
                 let tag = buf.read_u8().unwrap();
 
                 match tag {

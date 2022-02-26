@@ -10,16 +10,16 @@ pub async fn db_client_start() -> Client {
     let conn_string = format!(
         "host={} user={} dbname={} replication=database password={} sslmode={} connect_timeout=10",
         CONFIG
-            .get_str("POSTGRES_HOST")
+            .get_string("POSTGRES_HOST")
             .expect("Missing POSTGRES_HOST inside the config"),
         CONFIG
-            .get_str("POSTGRES_USER")
+            .get_string("POSTGRES_USER")
             .expect("Missing POSTGRES_USER inside the config"),
         CONFIG
-            .get_str("POSTGRES_DATABASE")
+            .get_string("POSTGRES_DATABASE")
             .expect("Missing POSTGRES_DATABASE inside the config"),
         CONFIG
-            .get_str("POSTGRES_PASSWORD")
+            .get_string("POSTGRES_PASSWORD")
             .expect("Missing POSTGRES_PASSWORD inside the config"),
         if tls { "require" } else { "disable" }
     );
@@ -66,7 +66,7 @@ pub async fn db_client_start() -> Client {
             rc
         }
     };
-    trace!("Postgres: connection etablished");
+    trace!("Postgres: connection established");
 
     client
 }

@@ -101,7 +101,7 @@ pub async fn run_server(server_state: Arc<ServerState>) {
             },
         );
 
-    let binding = CONFIG.get_str("BINDING").expect("BINDING must be set");
+    let binding = CONFIG.get_string("BINDING").expect("BINDING must be set");
     // Convert the binding into a SocketAddr
     let socket: SocketAddr = match binding.parse() {
         Ok(val) => val,
@@ -122,10 +122,10 @@ pub async fn run_server(server_state: Arc<ServerState>) {
 
     if https {
         let cert_path = CONFIG
-            .get_str("KEY_CERT")
+            .get_string("KEY_CERT")
             .expect("Missing KEY_CERT but HTTPS is true");
         let key_path = CONFIG
-            .get_str("KEY_PRIV")
+            .get_string("KEY_PRIV")
             .expect("Missing KEY_PRIV but HTTPS is true");
         // Run the Warp server infinitly
         serv.tls()

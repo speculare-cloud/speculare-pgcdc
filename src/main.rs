@@ -64,9 +64,16 @@ lazy_static::lazy_static! {
             std::process::exit(1);
         }
 
-        let mut config = Config::default();
-        config.merge(config::File::with_name(&args[1])).unwrap();
-        config
+        let config_builder = Config::builder()
+            .add_source(config::File::with_name(&args[1]));
+
+            match config_builder.build() {
+                Ok(conf) => conf,
+                Err(e) => {
+                    error!("Cannot build the config: {}", e);
+                    std::process::exit(1);
+                }
+            }
     };
 }
 
@@ -87,7 +94,7 @@ async fn main() {
     // Init the logger and set the debug level correctly
     configure_logger(
         CONFIG
-            .get_str("RUST_LOG")
+            .get_string("RUST_LOG")
             .unwrap_or_else(|_| "error,wrap=info".into()),
     );
 
