@@ -6,26 +6,20 @@ use tokio_postgres::{Client, NoTls};
 
 /// Connects to the Postgres server (using conn_string for server info)
 pub async fn db_client_start() -> Client {
-    let tls = CONFIG.get_bool("POSTGRES_TLS").unwrap_or(true);
-    let conn_string = format!(
+    let conn_string =
+        format!(
         "host={} user={} dbname={} replication=database password={} sslmode={} connect_timeout=10",
-        CONFIG
-            .get_string("POSTGRES_HOST")
-            .expect("Missing POSTGRES_HOST inside the config"),
-        CONFIG
-            .get_string("POSTGRES_USER")
-            .expect("Missing POSTGRES_USER inside the config"),
-        CONFIG
-            .get_string("POSTGRES_DATABASE")
-            .expect("Missing POSTGRES_DATABASE inside the config"),
-        CONFIG
-            .get_string("POSTGRES_PASSWORD")
-            .expect("Missing POSTGRES_PASSWORD inside the config"),
-        if tls { "require" } else { "disable" }
+        CONFIG.database_host,
+        CONFIG.database_user,
+        CONFIG.database_dbname,
+        CONFIG.database_password,
+        if CONFIG.database_tls { "require" } else { "disable" }
     );
 
     // TODO - Avoid all the duplicated code - Maybe using a macro ?
-    let client = match tls {
+    // Someone can help if he want, as connector is a different type in both case
+    // I don't know how to use common code for them. Unsafe here would be ok.
+    let client = match CONFIG.database_tls {
         true => {
             let connector =
                 MakeTlsConnector::new(SslConnector::builder(SslMethod::tls()).unwrap().build());
@@ -66,7 +60,7 @@ pub async fn db_client_start() -> Client {
             rc
         }
     };
-    trace!("Postgres: connection established");
+    info!("Postgres: connection established");
 
     client
 }

@@ -1,4 +1,3 @@
 /target
-Pgcdc.toml
-actix-web/
+pgcdc.config
 *.lock

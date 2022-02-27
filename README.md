@@ -44,7 +44,7 @@ $ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 $ sudo apt-get install libssl-dev libpq-dev pkg-config build-essential
 ```
 
-- Create a Pgcdc.toml file based on Pgcdc.example.toml
+- Create a pgcdc.config file based on pgcdc.example.config
 
 > **⚠ WARNING: Check the [docs](https://docs.speculare.cloud) !**
 

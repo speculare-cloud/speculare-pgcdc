@@ -36,8 +36,7 @@ pub async fn replication_slot_create(client: &Client, slot_name: &str) -> String
         slot_name
     );
 
-    let query_result = client.simple_query(slot_query).await;
-    let resp: Vec<SimpleQueryRow> = match query_result {
+    let resp: Vec<SimpleQueryRow> = match client.simple_query(slot_query).await {
         Ok(result) => result
             .into_iter()
             .filter_map(|data| match data {
@@ -100,7 +99,13 @@ pub async fn replication_stream_poll(duplex_stream: CopyBothDuplex<Bytes>, tx: S
         match data {
             Ok(bytes) => {
                 let mut buf = Cursor::new(bytes);
-                let tag = buf.read_u8().unwrap();
+                let tag = match buf.read_u8() {
+                    Ok(tag) => tag,
+                    Err(e) => {
+                        error!("Replication: cannot read_u8 for tag: {}", e);
+                        continue;
+                    }
+                };
 
                 match tag {
                     XLOG_DATA_TAG => {
@@ -116,7 +121,7 @@ pub async fn replication_stream_poll(duplex_stream: CopyBothDuplex<Bytes>, tx: S
                 }
             }
             Err(e) => {
-                error!("Replication: {}", e);
+                error!("Replication: unknown error: {}", e);
             }
         }
     }
@@ -130,7 +135,13 @@ pub async fn replication_stream_poll(duplex_stream: CopyBothDuplex<Bytes>, tx: S
 ///        since midnight on 2000-01-01.
 /// - Byte(n): The output from the logical replication output plugin.
 async fn parse_xlogdata_message(buf: &mut Cursor<Bytes>, sync_lsn: &mut u64, tx: &Sender<String>) {
-    let wal_pos = buf.read_u64::<BigEndian>().unwrap();
+    let wal_pos = match buf.read_u64::<BigEndian>() {
+        Ok(wal) => wal,
+        Err(e) => {
+            error!("XLogData: cannot read_u64 wal_pos: {}", e);
+            return;
+        }
+    };
     let _wal_end = buf.read_u64::<BigEndian>();
     let _ts = buf.read_u64::<BigEndian>();
 
@@ -174,8 +185,14 @@ async fn parse_keepalive_message(
     sync_lsn: &mut u64,
 ) {
     let wal_pos = buf.read_u64::<BigEndian>().unwrap();
-    let _ = buf.read_i64::<BigEndian>().unwrap(); // timestamp
-    let reply_requested = buf.read_u8().unwrap() == 1;
+    let _ = buf.read_i64::<BigEndian>(); // timestamp
+    let reply_requested = match buf.read_u8() {
+        Ok(reply) => reply == 1,
+        Err(e) => {
+            error!("Keepalive: cannot read_u8 reply_requested: {}", e);
+            return;
+        }
+    };
 
     // Not 100% sure whether it's semantically correct to update our LSN position here --
     // the keepalive message indicates the latest position on the server, which might not

@@ -1,3 +1,6 @@
+#[global_allocator]
+static ALLOC: snmalloc_rs::SnMalloc = snmalloc_rs::SnMalloc;
+
 #[macro_use]
 extern crate log;
 
@@ -7,11 +10,22 @@ macro_rules! has_bit {
     };
 }
 
-mod cdc;
-mod server;
-mod utils;
-mod websockets;
+macro_rules! field_isset {
+    ($value:expr, $name:literal) => {
+        match $value {
+            Some(x) => x,
+            None => {
+                error!(
+                    "Config: optional field {} is not defined but is needed.",
+                    $name
+                );
+                std::process::exit(1);
+            }
+        }
+    };
+}
 
+use crate::utils::config::Config;
 use crate::websockets::{forwarder::start_forwarder, ServerState};
 
 use ahash::AHashMap;
@@ -20,9 +34,27 @@ use cdc::{
     replication::{replication_slot_create, replication_stream_poll, replication_stream_start},
     ExtConfig,
 };
-use config::Config;
+use clap::Parser;
+use clap_verbosity_flag::InfoLevel;
+use std::ffi::OsStr;
+use std::path::Path;
 use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
+
+mod cdc;
+mod server;
+mod utils;
+mod websockets;
+
+#[derive(Parser, Debug)]
+#[clap(author, version, about)]
+struct Args {
+    #[clap(short = 'c', long = "config")]
+    config_path: Option<String>,
+
+    #[clap(flatten)]
+    verbose: clap_verbosity_flag::Verbosity<InfoLevel>,
+}
 
 // Static array to hold the tables in the order of creation in the database.
 // As we use TimescaleDB, each table get partitioned using a pattern like "_hyper_x_y_chunk",
@@ -47,56 +79,38 @@ lazy_static::lazy_static! {
             (7, "ionets".into())
         ].iter().cloned().collect())
     };
-}
 
-// Lazy static of the Config which is loaded from Alerts.toml
-lazy_static::lazy_static! {
-    static ref CONFIG: Config = {
-        // Get arguments
-        let args: Vec<String> = std::env::args().collect();
-
-        // Verify if we have the correct number of arguments
-        if args.len() != 2 {
-            println!(
-                "speculare-pgcdc: too {} arguments: missing a \"path/to/Config.toml\"",
-                if args.len() > 2 { "many" } else { "few" }
-            );
+    // Lazy static of the Config which is loaded from the config file
+    static ref CONFIG: Config = match Config::new() {
+        Ok(config) => config,
+        Err(e) => {
+            error!("Cannot build the Config: {:?}", e);
             std::process::exit(1);
         }
-
-        let config_builder = Config::builder()
-            .add_source(config::File::with_name(&args[1]));
-
-            match config_builder.build() {
-                Ok(conf) => conf,
-                Err(e) => {
-                    error!("Cannot build the config: {}", e);
-                    std::process::exit(1);
-                }
-            }
     };
 }
 
-/// Configure the logger level for any binary calling it
-fn configure_logger(level: String) {
-    // Check if the RUST_LOG already exist in the sys
-    if std::env::var_os("RUST_LOG").is_none() {
-        // if it doesn't, assign a default value to RUST_LOG
-        // Define RUST_LOG as trace for debug and error for prod
-        std::env::set_var("RUST_LOG", level);
-    }
-    // Init the logger
-    env_logger::init();
+pub fn prog() -> Option<String> {
+    std::env::args()
+        .next()
+        .as_ref()
+        .map(Path::new)
+        .and_then(Path::file_name)
+        .and_then(OsStr::to_str)
+        .map(String::from)
 }
 
 #[tokio::main]
 async fn main() {
-    // Init the logger and set the debug level correctly
-    configure_logger(
-        CONFIG
-            .get_string("RUST_LOG")
-            .unwrap_or_else(|_| "error,wrap=info".into()),
-    );
+    let args = Args::parse();
+
+    // Init logger
+    env_logger::Builder::new()
+        .filter_module(
+            &prog().map_or_else(|| "speculare_pgcdc".to_owned(), |f| f.replace('-', "_")),
+            args.verbose.log_level_filter(),
+        )
+        .init();
 
     // Form replication connection & keep the connection open
     let client = db_client_start().await;

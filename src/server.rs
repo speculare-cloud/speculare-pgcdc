@@ -101,18 +101,15 @@ pub async fn run_server(server_state: Arc<ServerState>) {
             },
         );
 
-    let binding = CONFIG.get_string("BINDING").expect("BINDING must be set");
     // Convert the binding into a SocketAddr
-    let socket: SocketAddr = match binding.parse() {
+    let socket: SocketAddr = match CONFIG.binding.parse() {
         Ok(val) => val,
         Err(e) => {
             error!("The BINDING is not a valid SocketAddr: {}", e);
-            return;
+            std::process::exit(1);
         }
     };
 
-    // Check if we should enable https
-    let https = CONFIG.get_bool("HTTPS").unwrap_or(false);
     let serv = warp::serve(
         warp::any()
             .and(warp::path("ping"))
@@ -120,21 +117,18 @@ pub async fn run_server(server_state: Arc<ServerState>) {
             .or(ws_handlers),
     );
 
-    if https {
-        let cert_path = CONFIG
-            .get_string("KEY_CERT")
-            .expect("Missing KEY_CERT but HTTPS is true");
-        let key_path = CONFIG
-            .get_string("KEY_PRIV")
-            .expect("Missing KEY_PRIV but HTTPS is true");
-        // Run the Warp server infinitly
+    if CONFIG.https {
+        let key_priv = field_isset!(CONFIG.key_priv.as_ref(), "key_priv");
+        let key_cert = field_isset!(CONFIG.key_cert.as_ref(), "key_cert");
+
+        // Run the Warp server infinitely
         serv.tls()
-            .cert_path(cert_path)
-            .key_path(key_path)
+            .cert_path(key_cert)
+            .key_path(key_priv)
             .run(socket)
             .await;
     } else {
-        // Run the Warp server infinitly
+        // Run the Warp server infinitely
         serv.run(socket).await;
     }
 }
