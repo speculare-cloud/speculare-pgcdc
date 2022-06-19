@@ -1,11 +1,12 @@
 /// List of supported data type
-#[derive(Clone)]
+#[derive(Debug)]
 pub enum DataType {
     String(String),
+    Array(Vec<String>),
 }
 
 /// Contains the specific filter applied to the Ws
-#[derive(Clone)]
+#[derive(Debug)]
 pub struct SpecificFilter {
     pub column: serde_json::Value,
     pub value: DataType,
@@ -39,6 +40,10 @@ impl SpecificFilter {
                         None => false,
                     }
                 }
+                DataType::Array(val) => match targeted_value.as_str() {
+                    Some(t) => val.iter().any(|x| x == t),
+                    None => false,
+                },
             };
         }
         false

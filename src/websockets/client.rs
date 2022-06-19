@@ -39,40 +39,42 @@ pub async fn client_connected(
         }
     }));
 
+    let change_flag = watch_for.change_flag;
+    let change_table = watch_for.change_table.to_owned();
     // Save the sender in our list of connected clients.
     server_state.clients.write().unwrap().insert(
         my_id,
         SessionInfo {
             gate: tx.clone(),
-            watch_for: watch_for.to_owned(),
+            watch_for,
         },
     );
 
     // Insert in the right category depending on the ChangeType
-    if has_bit!(watch_for.change_flag, INSERT) {
+    if has_bit!(change_flag, INSERT) {
         server_state
             .inserts
             .write()
             .unwrap()
-            .entry(watch_for.change_table.to_owned())
+            .entry(change_table.clone())
             .or_insert_with(AHashSet::new)
             .insert(my_id);
     }
-    if has_bit!(watch_for.change_flag, UPDATE) {
+    if has_bit!(change_flag, UPDATE) {
         server_state
             .updates
             .write()
             .unwrap()
-            .entry(watch_for.change_table.to_owned())
+            .entry(change_table.clone())
             .or_insert_with(AHashSet::new)
             .insert(my_id);
     }
-    if has_bit!(watch_for.change_flag, DELETE) {
+    if has_bit!(change_flag, DELETE) {
         server_state
             .deletes
             .write()
             .unwrap()
-            .entry(watch_for.change_table)
+            .entry(change_table)
             .or_insert_with(AHashSet::new)
             .insert(my_id);
     }
@@ -133,7 +135,7 @@ pub async fn client_connected(
 
     // user_ws_rx stream will keep processing as long as the user stays
     // connected. Once they disconnect, then...
-    user_disconnected(my_id, &server_state, watch_for.change_flag).await;
+    user_disconnected(my_id, &server_state, change_flag).await;
 }
 
 async fn user_disconnected(my_id: usize, server_state: &Arc<ServerState>, change_flag: u8) {

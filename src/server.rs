@@ -59,12 +59,26 @@ fn parse_ws_query(params: &ListQueryParams) -> Result<WsWatchFor, Response<Body>
 
     // Construct the SpecificFilter from the request
     let specific: Option<SpecificFilter> = if let Some(filter) = parts.next() {
-        let mut fparts = filter.splitn(2, ".eq.");
-        match (fparts.next(), fparts.next()) {
-            (Some(col), Some(val)) => Some(SpecificFilter {
-                column: serde_json::Value::String(col.to_owned()),
-                value: DataType::String(val.to_owned()),
-            }),
+        let mut fparts = filter.splitn(3, '.');
+        // let mut fparts = filter.splitn(2, ".eq.");
+        match (fparts.next(), fparts.next(), fparts.next()) {
+            (Some(col), Some(eq), Some(val)) => match eq {
+                "eq" => Some(SpecificFilter {
+                    column: serde_json::Value::String(col.to_owned()),
+                    value: DataType::String(val.to_owned()),
+                }),
+                "in" => {
+                    let items = val
+                        .split(',')
+                        .map(|s| s.to_string())
+                        .collect::<Vec<String>>();
+                    Some(SpecificFilter {
+                        column: serde_json::Value::String(col.to_owned()),
+                        value: DataType::Array(items),
+                    })
+                }
+                _ => None,
+            },
             _ => None,
         }
     } else {

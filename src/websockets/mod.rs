@@ -33,7 +33,6 @@ type Clients = Arc<RwLock<AHashMap<usize, SessionInfo>>>;
 type TypeList = Arc<RwLock<AHashMap<String, AHashSet<usize>>>>;
 
 /// Contains info for what does the Ws is listening to
-#[derive(Clone)]
 pub struct WsWatchFor {
     pub change_table: String,
     pub change_flag: u8,
