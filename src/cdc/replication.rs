@@ -93,36 +93,53 @@ pub async fn replication_stream_start(
 /// Tries to read and process one message from a replication stream, using async I/O.
 pub async fn replication_stream_poll(duplex_stream: CopyBothDuplex<Bytes>, tx: Sender<String>) {
     let mut boxed = Box::pin(duplex_stream);
+    let mut interval = tokio::time::interval(Duration::from_secs(5));
 
     let mut sync_lsn: u64 = 0;
-    while let Some(data) = boxed.next().await {
-        match data {
-            Ok(bytes) => {
-                let mut buf = Cursor::new(bytes);
-                let tag = match buf.read_u8() {
-                    Ok(tag) => tag,
-                    Err(e) => {
-                        error!("Replication: cannot read_u8 for tag: {}", e);
-                        continue;
-                    }
-                };
 
-                match tag {
-                    XLOG_DATA_TAG => {
-                        parse_xlogdata_message(&mut buf, &mut sync_lsn, &tx).await;
-                    }
-                    PRIMARY_KEEPALIVE_TAG => {
-                        parse_keepalive_message(&mut boxed, &mut buf, &mut sync_lsn).await;
-                    }
-                    tag => {
-                        error!("Replication: Unknown streaming message type: `{}`", tag);
-                        continue;
+    loop {
+        tokio::select! {
+            _ = interval.tick() => {
+                trace!("Replication: sending the keepalive to check the state of the connection");
+                // TODO - Auto reconnect in case of failure
+                match send_checkpoint(&mut boxed, sync_lsn).await {
+                    Ok(_) => {},
+                    Err(e) => {
+                        error!("Replication: cannot contact the database: {}", e);
+                        std::process::exit(1);
                     }
                 }
-            }
-            Err(e) => {
-                error!("Replication: unknown error: {}", e);
-            }
+            },
+            Some(data) = boxed.next() => {
+                match data {
+                    Ok(bytes) => {
+                        let mut buf = Cursor::new(bytes);
+                        let tag = match buf.read_u8() {
+                            Ok(tag) => tag,
+                            Err(e) => {
+                                error!("Replication: cannot read_u8 for tag: {}", e);
+                                continue;
+                            }
+                        };
+
+                        match tag {
+                            XLOG_DATA_TAG => {
+                                parse_xlogdata_message(&mut buf, &mut sync_lsn, &tx).await;
+                            }
+                            PRIMARY_KEEPALIVE_TAG => {
+                                parse_keepalive_message(&mut boxed, &mut buf, &mut sync_lsn).await;
+                            }
+                            tag => {
+                                error!("Replication: Unknown streaming message type: `{}`", tag);
+                                continue;
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        error!("Replication: unknown error: {}", e);
+                    }
+                }
+            },
         }
     }
 }
@@ -208,7 +225,12 @@ async fn parse_keepalive_message(
     );
 
     if reply_requested {
-        send_checkpoint(conn, *sync_lsn).await;
+        // A failure here is not that big of a deal as
+        // if we can't send the checkpoint, PostgreSQL
+        // will cut the connection anyway and we'll just
+        // restart it (depends on the config of the service).
+        // TODO - Auto reconnect in case of failure
+        _ = send_checkpoint(conn, *sync_lsn).await;
     }
 }
 
@@ -221,7 +243,10 @@ async fn parse_keepalive_message(
 /// - u64: The location of the last WAL byte + 1 applied to the client DB.
 /// - u64: The client's system clock, as microseconds since midnight on 2000-01-01.
 /// - u8: If 1, the client requests the server to reply to this message immediately.
-async fn send_checkpoint(conn: &mut Pin<Box<CopyBothDuplex<Bytes>>>, lsn: u64) {
+async fn send_checkpoint(
+    conn: &mut Pin<Box<CopyBothDuplex<Bytes>>>,
+    lsn: u64,
+) -> Result<(), tokio_postgres::Error> {
     let mut ka_buf = BytesMut::with_capacity(34);
 
     ka_buf.put_u8(b'r');
@@ -231,7 +256,9 @@ async fn send_checkpoint(conn: &mut Pin<Box<CopyBothDuplex<Bytes>>>, lsn: u64) {
     ka_buf.put_u64(current_time());
     ka_buf.put_u8(0);
 
-    let _ = (*conn).send(ka_buf.freeze()).await;
+    let res = (*conn).send(ka_buf.freeze()).await;
 
     trace!("Checkpoint: lsn: {}/{:X}", lsn >> 32, lsn);
+
+    res
 }
