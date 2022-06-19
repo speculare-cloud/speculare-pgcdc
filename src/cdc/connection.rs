@@ -26,15 +26,15 @@ pub async fn db_client_start() -> Client {
             let (rc, rco) = match tokio_postgres::connect(&conn_string, connector).await {
                 Ok((rc, rco)) => (rc, rco),
                 Err(e) => {
-                    error!("Postgres: connection failed: {}", e);
+                    error!("Postgres: connection failed: {}, {:?}", e, e.as_db_error());
                     std::process::exit(1);
                 }
             };
 
             tokio::spawn(async move {
                 if let Err(e) = rco.await {
+                    // Don't exit after this because we handle the "reconnection"
                     error!("Postgres: connection broken due to: {}", e);
-                    std::process::exit(1);
                 }
             });
 
@@ -52,8 +52,8 @@ pub async fn db_client_start() -> Client {
 
             tokio::spawn(async move {
                 if let Err(e) = rco.await {
+                    // Don't exit after this because we handle the "reconnection"
                     error!("Postgres: connection broken due to: {}", e);
-                    std::process::exit(1);
                 }
             });
 

@@ -93,20 +93,18 @@ pub async fn replication_stream_start(
 /// Tries to read and process one message from a replication stream, using async I/O.
 pub async fn replication_stream_poll(duplex_stream: CopyBothDuplex<Bytes>, tx: Sender<String>) {
     let mut boxed = Box::pin(duplex_stream);
-    let mut interval = tokio::time::interval(Duration::from_secs(5));
-
+    let mut interval = tokio::time::interval(Duration::from_secs(10));
     let mut sync_lsn: u64 = 0;
 
     loop {
         tokio::select! {
             _ = interval.tick() => {
                 trace!("Replication: sending the keepalive to check the state of the connection");
-                // TODO - Auto reconnect in case of failure
                 match send_checkpoint(&mut boxed, sync_lsn).await {
                     Ok(_) => {},
                     Err(e) => {
                         error!("Replication: cannot contact the database: {}", e);
-                        std::process::exit(1);
+                        return;
                     }
                 }
             },
@@ -126,16 +124,28 @@ pub async fn replication_stream_poll(duplex_stream: CopyBothDuplex<Bytes>, tx: S
                             XLOG_DATA_TAG => {
                                 parse_xlogdata_message(&mut buf, &mut sync_lsn, &tx).await;
                             }
+                            // The keepalive here is not mandatory as we already send a keepalive every 10s
+                            // but for the sake of stableness, I keep it here.
                             PRIMARY_KEEPALIVE_TAG => {
-                                parse_keepalive_message(&mut boxed, &mut buf, &mut sync_lsn).await;
+                                match parse_keepalive_message(&mut boxed, &mut buf, &mut sync_lsn).await {
+                                    Ok(_) => {},
+                                    Err(e) => {
+                                        error!("Replication: parse_keepalive_message failed: {}", e);
+                                        return;
+                                    }
+                                }
                             }
-                            tag => {
+                            _ => {
                                 error!("Replication: Unknown streaming message type: `{}`", tag);
                                 continue;
                             }
                         }
                     }
                     Err(e) => {
+                        if e.is_closed() {
+                            error!("Replication: the connection has been closed");
+                            return;
+                        }
                         error!("Replication: unknown error: {}", e);
                     }
                 }
@@ -200,14 +210,15 @@ async fn parse_keepalive_message(
     conn: &mut Pin<Box<CopyBothDuplex<Bytes>>>,
     buf: &mut Cursor<Bytes>,
     sync_lsn: &mut u64,
-) {
+) -> Result<(), tokio_postgres::Error> {
     let wal_pos = buf.read_u64::<BigEndian>().unwrap();
     let _ = buf.read_i64::<BigEndian>(); // timestamp
     let reply_requested = match buf.read_u8() {
         Ok(reply) => reply == 1,
         Err(e) => {
             error!("Keepalive: cannot read_u8 reply_requested: {}", e);
-            return;
+            // This is not a fatal error that need to restart everything
+            return Ok(());
         }
     };
 
@@ -215,23 +226,25 @@ async fn parse_keepalive_message(
     // the keepalive message indicates the latest position on the server, which might not
     // necessarily correspond to the latest position on the client. But this is what
     // pg_recvlogical does, so it's probably ok.
-    *sync_lsn = std::cmp::max(wal_pos, *sync_lsn);
-
-    trace!(
-        "Keepalive: wal_pos {}/{:X}, reply_requested {}",
-        wal_pos >> 32,
-        wal_pos,
-        reply_requested
-    );
+    // UPDATE: disabling it as I truly think this is not correct.
+    // *sync_lsn = std::cmp::max(wal_pos, *sync_lsn);
 
     if reply_requested {
+        trace!(
+            "Keepalive: wal_pos {}/{:X}, reply_requested {}",
+            wal_pos >> 32,
+            wal_pos,
+            reply_requested
+        );
+
         // A failure here is not that big of a deal as
         // if we can't send the checkpoint, PostgreSQL
         // will cut the connection anyway and we'll just
-        // restart it (depends on the config of the service).
-        // TODO - Auto reconnect in case of failure
-        _ = send_checkpoint(conn, *sync_lsn).await;
+        // restart it.
+        return send_checkpoint(conn, *sync_lsn).await;
     }
+
+    Ok(())
 }
 
 /// Send a "Standby status update" message to server, indicating the LSN up to which we

@@ -112,12 +112,6 @@ async fn main() {
         )
         .init();
 
-    // Form replication connection & keep the connection open
-    let client = db_client_start().await;
-
-    client.detect_tables().await;
-    trace!("Main: Allowed tables are: {:?}", &TABLES.read().unwrap());
-
     // A multi-producer, single-consumer channel queue. Using 128 buffers length.
     let (tx, rx) = mpsc::channel(128);
 
@@ -129,10 +123,27 @@ async fn main() {
 
     // Init the replication slot and listen to the duplex_stream
     tokio::spawn(async move {
-        let slot_name = uuid_readable_rs::short().replace(' ', "_").to_lowercase();
-        let lsn = replication_slot_create(&client, &slot_name).await;
-        let duplex_stream = replication_stream_start(&client, &slot_name, &lsn).await;
-        replication_stream_poll(duplex_stream, tx).await;
+        let mut count = 0u8;
+        loop {
+            // Form replication connection & keep the connection open
+            let client = db_client_start().await;
+            client.detect_tables().await;
+            trace!("Main: Allowed tables are: {:?}", &TABLES.read().unwrap());
+
+            let slot_name = uuid_readable_rs::short().replace(' ', "_").to_lowercase();
+            let lsn = replication_slot_create(&client, &slot_name).await;
+            let duplex_stream = replication_stream_start(&client, &slot_name, &lsn).await;
+            replication_stream_poll(duplex_stream, tx.clone()).await;
+
+            // Don't spam too fast in case of bootloop
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            count += 1;
+
+            if count >= 3 {
+                error!("Replication: boot loop, stopping...");
+                std::process::exit(1);
+            }
+        }
     });
 
     server::run_server(server_state).await
