@@ -1,3 +1,4 @@
 /target
 pgcdc.config
+pgauth.config
 *.lock
