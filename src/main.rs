@@ -29,6 +29,9 @@ use crate::utils::config::Config;
 use crate::websockets::{forwarder::start_forwarder, ServerState};
 
 use ahash::AHashMap;
+use bastion::spawn;
+use bastion::supervisor::{ActorRestartStrategy, RestartStrategy, SupervisorRef};
+use bastion::{prelude::BastionContext, Bastion};
 use cdc::{
     connection::db_client_start,
     replication::{replication_slot_create, replication_stream_poll, replication_stream_start},
@@ -39,6 +42,8 @@ use clap_verbosity_flag::InfoLevel;
 use std::ffi::OsStr;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
+use std::time::Duration;
+use tokio::select;
 use tokio::sync::mpsc;
 
 mod cdc;
@@ -88,9 +93,23 @@ lazy_static::lazy_static! {
             std::process::exit(1);
         }
     };
+
+    static ref SUPERVISOR: SupervisorRef = match Bastion::supervisor(|sp| {
+        sp.with_restart_strategy(RestartStrategy::default().with_actor_restart_strategy(
+            ActorRestartStrategy::LinearBackOff {
+                timeout: Duration::from_secs(3),
+            },
+        ))
+    }) {
+        Ok(sp) => sp,
+        Err(err) => {
+            error!("Cannot create the Bastion supervisor: {:?}", err);
+            std::process::exit(1);
+        }
+    };
 }
 
-pub fn prog() -> Option<String> {
+fn prog() -> Option<String> {
     std::env::args()
         .next()
         .as_ref()
@@ -112,39 +131,53 @@ async fn main() {
         )
         .init();
 
-    // A multi-producer, single-consumer channel queue. Using 128 buffers length.
-    let (tx, rx) = mpsc::channel(128);
-
     // Construct our default server state
     let server_state = Arc::new(ServerState::default());
 
-    // Start listening to the Sender & forward message when receiving one
-    start_forwarder(rx, server_state.clone());
+    // Init Bastion supervisor
+    Bastion::init();
+    Bastion::start();
 
-    // Init the replication slot and listen to the duplex_stream
-    tokio::spawn(async move {
-        let mut count = 0u8;
-        loop {
-            // Form replication connection & keep the connection open
-            let client = db_client_start().await;
-            client.detect_tables().await;
-            trace!("Main: Allowed tables are: {:?}", &TABLES.read().unwrap());
+    // Clone server_state for run_server
+    let cserver_state = server_state.clone();
 
-            let slot_name = uuid_readable_rs::short().replace(' ', "_").to_lowercase();
-            let lsn = replication_slot_create(&client, &slot_name).await;
-            let duplex_stream = replication_stream_start(&client, &slot_name, &lsn).await;
-            replication_stream_poll(duplex_stream, tx.clone()).await;
+    // Start the children in Bastion (allow for restart if fails)
+    SUPERVISOR
+        .children(|child| {
+            child.with_exec(move |_: BastionContext| {
+                trace!("Starting the replication forwarder & listener");
+                let server_state = server_state.clone();
 
-            // Don't spam too fast in case of bootloop
-            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-            count += 1;
+                async move {
+                    // A multi-producer, single-consumer channel queue. Using 128 buffers length.
+                    let (tx, rx) = mpsc::channel(128);
 
-            if count >= 3 {
-                error!("Replication: boot loop, stopping...");
-                std::process::exit(1);
-            }
-        }
-    });
+                    // Start listening to the Sender & forward message when receiving one
+                    let handle = spawn! {
+                        start_forwarder(rx, server_state).await;
+                    };
 
-    server::run_server(server_state).await
+                    // Form replication connection & keep the connection open
+                    let client = db_client_start().await;
+                    client.detect_tables().await;
+                    trace!("Main: Allowed tables are: {:?}", &TABLES.read().unwrap());
+
+                    let slot_name = uuid_readable_rs::short().replace(' ', "_").to_lowercase();
+                    let lsn = replication_slot_create(&client, &slot_name).await;
+                    let duplex_stream = replication_stream_start(&client, &slot_name, &lsn).await;
+
+                    select! {
+                        _ = replication_stream_poll(duplex_stream, tx.clone()) => {
+                            panic!("replication_stream_poll exited, panic to restart")
+                        }
+                        _ = handle => {
+                            panic!("start_forwarder exited, panic to restart")
+                        }
+                    }
+                }
+            })
+        })
+        .expect("Cannot create the Children for Bastion");
+
+    server::run_server(cserver_state).await
 }
