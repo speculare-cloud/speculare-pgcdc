@@ -125,11 +125,12 @@ async fn main() {
     // Construct our default server state
     let server_state = Arc::new(ServerState::default());
 
-    // Init Bastion supervisor
+    // Init and Start Bastion supervisor
     Bastion::init();
     Bastion::start();
 
-    // Clone server_state for run_server
+    // Clone server_state for run_server (below) as we use server_state
+	// in our SUPERVISOR.children.
     let cserver_state = server_state.clone();
 
     // Start the children in Bastion (allow for restart if fails)
@@ -158,6 +159,8 @@ async fn main() {
                     let lsn = replication_slot_create(&client, &slot_name).await;
                     let duplex_stream = replication_stream_start(&client, &slot_name, &lsn).await;
 
+                    // call to panic allow us to exit this children and restart a new one
+                    // in case any of the two (replication_stream_poll or handle) exit.
                     select! {
                         _ = replication_stream_poll(duplex_stream, tx.clone()) => {
                             panic!("replication_stream_poll exited, panic to restart")
