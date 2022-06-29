@@ -18,21 +18,6 @@ macro_rules! has_bit {
     };
 }
 
-macro_rules! field_isset {
-    ($value:expr, $name:literal) => {
-        match $value {
-            Some(x) => x,
-            None => {
-                error!(
-                    "Config: optional field {} is not defined but is needed.",
-                    $name
-                );
-                std::process::exit(1);
-            }
-        }
-    };
-}
-
 use crate::utils::config::Config;
 use crate::websockets::{forwarder::start_forwarder, ServerState};
 
@@ -130,7 +115,7 @@ async fn main() {
     Bastion::start();
 
     // Clone server_state for run_server (below) as we use server_state
-	// in our SUPERVISOR.children.
+    // in our SUPERVISOR.children.
     let cserver_state = server_state.clone();
 
     // Start the children in Bastion (allow for restart if fails)

@@ -12,6 +12,21 @@ use warp::{
     Filter, Reply,
 };
 
+macro_rules! field_isset {
+    ($value:expr, $name:literal) => {
+        match $value {
+            Some(x) => x,
+            None => {
+                error!(
+                    "Config: optional field {} is not defined but is needed.",
+                    $name
+                );
+                std::process::exit(1);
+            }
+        }
+    };
+}
+
 fn parse_ws_query(params: &ListQueryParams) -> Result<WsWatchFor, Response<Body>> {
     let mut parts = params.query.split(':');
     let mut change_flag = 0;
