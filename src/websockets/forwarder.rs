@@ -1,4 +1,4 @@
-use crate::{websockets, TABLES_BY_INDEX};
+use crate::{websockets, CONFIG};
 
 use super::{ServerState, DELETE, INSERT, UPDATE};
 
@@ -27,7 +27,7 @@ fn get_table_name(table_name: &str) -> String {
         };
         // Get the table name from the index and return an owned String
         // or continue the loop and skip this value if not found.
-        match TABLES_BY_INDEX.read().unwrap().get(&(idx as usize)) {
+        match CONFIG.lookup_table.get(&(idx as usize)) {
             Some(val) => return val.to_owned(),
             None => {
                 error!(

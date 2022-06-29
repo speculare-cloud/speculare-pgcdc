@@ -1,3 +1,11 @@
+//! Quick note about the database table name due to Tailscale:
+//! > Static array to hold the tables in the order of creation in the database.
+//!   As we use TimescaleDB, each table get partitioned using a pattern like "_hyper_x_y_chunk",
+//!   which don't give us the opportunity to detect which table is being updated/inserted.
+//!   As the client will connect to the WS using the base table name, this array is used for lookup.
+//!   The pattern always follow the same naming convention: "_hyper_(table_creation_order_from_1)_(partition_number)_chunk".
+//!   So we use this array to derive the name of the table from the pattern naming chunk.
+
 #[global_allocator]
 static ALLOC: snmalloc_rs::SnMalloc = snmalloc_rs::SnMalloc;
 
@@ -38,7 +46,6 @@ use cdc::{
 };
 use clap::Parser;
 use clap_verbosity_flag::InfoLevel;
-use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
@@ -66,16 +73,6 @@ lazy_static::lazy_static! {
     // Allow us to avoid accepting websocket which will never be triggered
     static ref TABLES: RwLock<Vec<String>> = {
         RwLock::new(Vec::new())
-    };
-
-    // Static array to hold the tables in the order of creation in the database.
-    // As we use TimescaleDB, each table get partitioned using a pattern like "_hyper_x_y_chunk",
-    // which don't give us the opportunity to detect which table is being updated/inserted.
-    // As the client will connect to the WS using the base table name, this array is used for lookup.
-    // The pattern always follow the same naming convention: "_hyper_(table_creation_order_from_1)_(partition_number)_chunk".
-    // So we use this array to derive the name of the table from the pattern naming chunk.
-    static ref TABLES_BY_INDEX: RwLock<HashMap<usize, String>> = {
-        RwLock::new(CONFIG.lookup_table.clone())
     };
 
     // Lazy static of the Config which is loaded from the config file
@@ -155,10 +152,7 @@ async fn main() {
                     let client = db_client_start().await;
                     client.detect_tables().await;
                     trace!("Main: Allowed tables are: {:?}", &TABLES.read().unwrap());
-                    trace!(
-                        "Main: Tables lookup are: {:?}",
-                        &TABLES_BY_INDEX.read().unwrap()
-                    );
+                    trace!("Main: Tables lookup are: {:?}", &CONFIG.lookup_table);
 
                     let slot_name = uuid_readable_rs::short().replace(' ', "_").to_lowercase();
                     let lsn = replication_slot_create(&client, &slot_name).await;
