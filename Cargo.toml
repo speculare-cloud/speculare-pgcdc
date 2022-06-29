@@ -14,7 +14,7 @@ bytes = "1"
 byteorder = "1.4"
 clap = { version = "3.1", features = ["derive"] }
 clap-verbosity-flag = "1.0"
-config = "0.13"
+config = { version = "0.13", features = ["toml"] }
 env_logger = "0.9"
 futures = "0.3"
 lazy_static = "1.4"

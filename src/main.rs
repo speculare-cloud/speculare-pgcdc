@@ -28,7 +28,6 @@ macro_rules! field_isset {
 use crate::utils::config::Config;
 use crate::websockets::{forwarder::start_forwarder, ServerState};
 
-use ahash::AHashMap;
 use bastion::spawn;
 use bastion::supervisor::{ActorRestartStrategy, RestartStrategy, SupervisorRef};
 use bastion::{prelude::BastionContext, Bastion};
@@ -39,6 +38,7 @@ use cdc::{
 };
 use clap::Parser;
 use clap_verbosity_flag::InfoLevel;
+use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
@@ -61,28 +61,21 @@ struct Args {
     verbose: clap_verbosity_flag::Verbosity<InfoLevel>,
 }
 
-// Static array to hold the tables in the order of creation in the database.
-// As we use TimescaleDB, each table get partitioned using a pattern like "_hyper_x_y_chunk",
-// which don't give us the opportunity to detect which table is being updated/inserted.
-// As the client will connect to the WS using the base table name, this array is used for lookup.
-// The pattern always follow the same naming convention: "_hyper_(table_creation_order_from_1)_(partition_number)_chunk".
-// So we use this array to derive the name of the table from the pattern naming chunk.
 lazy_static::lazy_static! {
+    // Which table are allowed (hard defined at startup for now)
+    // Allow us to avoid accepting websocket which will never be triggered
     static ref TABLES: RwLock<Vec<String>> = {
         RwLock::new(Vec::new())
     };
 
-    static ref TABLES_BY_INDEX: RwLock<AHashMap<usize, String>> = {
-        RwLock::new([
-            (0, "disks".into()),
-            (1, "cputimes".into()),
-            (2, "cpustats".into()),
-            (3, "ioblocks".into()),
-            (4, "loadavg".into()),
-            (5, "memory".into()),
-            (6, "swap".into()),
-            (7, "ionets".into())
-        ].iter().cloned().collect())
+    // Static array to hold the tables in the order of creation in the database.
+    // As we use TimescaleDB, each table get partitioned using a pattern like "_hyper_x_y_chunk",
+    // which don't give us the opportunity to detect which table is being updated/inserted.
+    // As the client will connect to the WS using the base table name, this array is used for lookup.
+    // The pattern always follow the same naming convention: "_hyper_(table_creation_order_from_1)_(partition_number)_chunk".
+    // So we use this array to derive the name of the table from the pattern naming chunk.
+    static ref TABLES_BY_INDEX: RwLock<HashMap<usize, String>> = {
+        RwLock::new(CONFIG.lookup_table.clone())
     };
 
     // Lazy static of the Config which is loaded from the config file
@@ -94,6 +87,7 @@ lazy_static::lazy_static! {
         }
     };
 
+    // Bastion supervisor used to define a custom restart policy for the children
     static ref SUPERVISOR: SupervisorRef = match Bastion::supervisor(|sp| {
         sp.with_restart_strategy(RestartStrategy::default().with_actor_restart_strategy(
             ActorRestartStrategy::LinearBackOff {
@@ -161,6 +155,10 @@ async fn main() {
                     let client = db_client_start().await;
                     client.detect_tables().await;
                     trace!("Main: Allowed tables are: {:?}", &TABLES.read().unwrap());
+                    trace!(
+                        "Main: Tables lookup are: {:?}",
+                        &TABLES_BY_INDEX.read().unwrap()
+                    );
 
                     let slot_name = uuid_readable_rs::short().replace(' ', "_").to_lowercase();
                     let lsn = replication_slot_create(&client, &slot_name).await;
