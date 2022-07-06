@@ -1,4 +1,6 @@
-use crate::{websockets, CONFIG};
+use crate::websockets;
+#[cfg(feature = "timescale")]
+use crate::{cdc::extract_hyper_idx, TABLES_LOOKUP};
 
 use super::{ServerState, DELETE, INSERT, UPDATE};
 
@@ -12,12 +14,12 @@ use warp::ws::Message;
 /// This is used due to TimescaleDB renaming the hypertable using a
 /// pattern '_hyper_' with some number and all. If we can't convert the pattern
 /// back to it's original table name, return the pattern name.
+#[cfg(feature = "timescale")]
 fn get_table_name(table_name: &str) -> String {
     if table_name.starts_with("_hyper_") {
-        let mut parts = table_name.splitn(4, '_');
-        let idx = match parts.nth(2) {
-            Some(val) => val.parse::<i8>().unwrap() - 1,
-            None => {
+        let idx = match extract_hyper_idx(table_name) {
+            Ok(idx) => idx,
+            Err(_) => {
                 error!(
                     "Match table: table {} cannot be deconstructed into an idx",
                     table_name
@@ -27,7 +29,7 @@ fn get_table_name(table_name: &str) -> String {
         };
         // Get the table name from the index and return an owned String
         // or continue the loop and skip this value if not found.
-        match CONFIG.lookup_table.get(&(idx as usize)) {
+        match TABLES_LOOKUP.read().unwrap().get(&idx) {
             Some(val) => return val.to_owned(),
             None => {
                 error!(
@@ -98,7 +100,10 @@ pub async fn start_forwarder(mut rx: Receiver<String>, server_state: Arc<ServerS
                     {
                         // Get the table name from the _hyper_x_x_chunk
                         // See comment in the main.rs for more information.
+                        #[cfg(feature = "timescale")]
                         let table_name = get_table_name(table_name);
+                        #[cfg(not(feature = "timescale"))]
+                        let table_name = table_name.to_owned();
                         // Construct the change_flag
                         let mut change_flag = 0u8;
                         // At this stage, the change_flag can be only be one of INSERT, UPDATE, DELETE

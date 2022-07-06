@@ -3,7 +3,6 @@ use crate::Args;
 use clap::Parser;
 use config::ConfigError;
 use serde::Deserialize;
-use std::collections::HashMap;
 
 #[derive(Debug, Deserialize, Clone)]
 
@@ -15,9 +14,6 @@ pub struct Config {
     pub database_password: String,
     #[serde(default = "default_dbtls")]
     pub database_tls: bool,
-
-    #[serde(default = "default_lookup_table")]
-    pub lookup_table: HashMap<usize, String>,
 
     // HTTP API CONFIGS
     #[serde(default = "default_https")]
@@ -53,17 +49,4 @@ fn default_dbtls() -> bool {
 
 fn default_binding() -> String {
     String::from("0.0.0.0:8080")
-}
-
-fn default_lookup_table() -> HashMap<usize, String> {
-    HashMap::from([
-        (0, "disks".into()),
-        (1, "cputimes".into()),
-        (2, "cpustats".into()),
-        (3, "ioblocks".into()),
-        (4, "loadavg".into()),
-        (5, "memory".into()),
-        (6, "swap".into()),
-        (7, "ionets".into()),
-    ])
 }

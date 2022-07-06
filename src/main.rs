@@ -31,6 +31,8 @@ use cdc::{
 };
 use clap::Parser;
 use clap_verbosity_flag::InfoLevel;
+#[cfg(feature = "timescale")]
+use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
@@ -51,6 +53,14 @@ struct Args {
 
     #[clap(flatten)]
     verbose: clap_verbosity_flag::Verbosity<InfoLevel>,
+}
+
+#[cfg(feature = "timescale")]
+lazy_static::lazy_static! {
+    // Used with TimescaleDB to lookup the table name (disks may be _hyper_1 for example)
+    static ref TABLES_LOOKUP: RwLock<HashMap<i8, String>> = {
+        RwLock::new(HashMap::new())
+    };
 }
 
 lazy_static::lazy_static! {
@@ -136,9 +146,18 @@ async fn main() {
 
                     // Form replication connection & keep the connection open
                     let client = db_client_start().await;
+
+                    // Detect tables that we'll use to authorize or lookup with timescale
                     client.detect_tables().await;
                     trace!("Main: Allowed tables are: {:?}", &TABLES.read().unwrap());
-                    trace!("Main: Tables lookup are: {:?}", &CONFIG.lookup_table);
+                    #[cfg(feature = "timescale")]
+                    {
+                        client.detect_lookup().await;
+                        trace!(
+                            "Main: Tables lookup are: {:?}",
+                            &TABLES_LOOKUP.read().unwrap()
+                        );
+                    }
 
                     let slot_name = uuid_readable_rs::short().replace(' ', "_").to_lowercase();
                     let lsn = replication_slot_create(&client, &slot_name).await;
