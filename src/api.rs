@@ -6,7 +6,6 @@ use crate::{
     CONFIG, NEXT_CLIENT_ID, TABLES,
 };
 
-use ahash::AHashSet;
 use axum::{
     extract::{
         ws::{Message, WebSocket},
@@ -18,7 +17,7 @@ use axum::{
 use futures::{stream::SplitStream, FutureExt, StreamExt};
 use sproot::apierrors::ApiError;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     net::SocketAddr,
     sync::{atomic::Ordering, Arc},
 };
@@ -195,7 +194,7 @@ async fn ws_connected(
             .write()
             .unwrap()
             .entry(change_table.clone())
-            .or_insert_with(AHashSet::new)
+            .or_insert_with(HashSet::new)
             .insert(id);
     }
     if has_bit!(change_flag, UPDATE) {
@@ -204,7 +203,7 @@ async fn ws_connected(
             .write()
             .unwrap()
             .entry(change_table.clone())
-            .or_insert_with(AHashSet::new)
+            .or_insert_with(HashSet::new)
             .insert(id);
     }
     if has_bit!(change_flag, DELETE) {
@@ -213,7 +212,7 @@ async fn ws_connected(
             .write()
             .unwrap()
             .entry(change_table)
-            .or_insert_with(AHashSet::new)
+            .or_insert_with(HashSet::new)
             .insert(id);
     }
 

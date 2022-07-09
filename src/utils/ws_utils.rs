@@ -1,8 +1,10 @@
 use crate::utils::specific_filter::SpecificFilter;
 
-use ahash::{AHashMap, AHashSet};
 use axum::extract::ws::Message;
-use std::sync::{Arc, RwLock};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{Arc, RwLock},
+};
 use tokio::sync::mpsc;
 
 pub const INSERT: u8 = 1 << 1;
@@ -18,13 +20,13 @@ pub struct SessionInfo {
 ///
 /// - Key is their id
 /// - Value is a sender of `warp::ws::Message`
-type Clients = Arc<RwLock<AHashMap<usize, SessionInfo>>>;
+type Clients = Arc<RwLock<HashMap<usize, SessionInfo>>>;
 
 /// Our state of currently connected clients listening for a particular table.
 ///
 /// - Key is the table name
 /// - Value is a AHashSet containing all the client's id listening to that table.
-type TypeList = Arc<RwLock<AHashMap<String, AHashSet<usize>>>>;
+type TypeList = Arc<RwLock<HashMap<String, HashSet<usize>>>>;
 
 /// Contains info for what does the Ws is listening to
 pub struct WsWatchFor {

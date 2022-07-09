@@ -2,10 +2,9 @@ use crate::utils::ws_utils::{apply_flag, ServerState, DELETE, INSERT, UPDATE};
 #[cfg(feature = "timescale")]
 use crate::{cdc::extract_hyper_idx, TABLES_LOOKUP};
 
-use ahash::AHashSet;
 use axum::extract::ws::Message;
 use serde_json::Value;
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 use tokio::sync::mpsc::Receiver;
 
 /// Get the table name from an &str, returning a String
@@ -44,7 +43,7 @@ fn get_table_name(table_name: &str) -> String {
 /// Send a message to a specific group of sessions (insert, update or delete)
 fn send_message(
     message: &serde_json::Value,
-    sessions: Option<&AHashSet<usize>>,
+    sessions: Option<&HashSet<usize>>,
     server_state: &Arc<ServerState>,
 ) {
     // If no session were defined, skip
