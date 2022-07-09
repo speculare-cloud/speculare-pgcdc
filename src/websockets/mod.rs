@@ -1,22 +1,18 @@
 use crate::utils::specific_filter::SpecificFilter;
 
 use ahash::{AHashMap, AHashSet};
-use std::sync::{atomic::AtomicUsize, Arc, RwLock};
+use axum::extract::ws::Message;
+use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
-use warp::ws::Message;
 
-pub mod client;
 pub mod forwarder;
 
 pub const INSERT: u8 = 1 << 1;
 pub const UPDATE: u8 = 1 << 2;
 pub const DELETE: u8 = 1 << 3;
 
-/// Our global unique client id counter.
-static NEXT_CLIENT_ID: AtomicUsize = AtomicUsize::new(1);
-
 pub struct SessionInfo {
-    pub gate: mpsc::UnboundedSender<Result<Message, warp::Error>>,
+    pub gate: mpsc::UnboundedSender<Result<Message, axum::Error>>,
     pub watch_for: WsWatchFor,
 }
 

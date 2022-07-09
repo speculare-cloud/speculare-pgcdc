@@ -5,10 +5,10 @@ use crate::{cdc::extract_hyper_idx, TABLES_LOOKUP};
 use super::{ServerState, DELETE, INSERT, UPDATE};
 
 use ahash::AHashSet;
+use axum::extract::ws::Message;
 use serde_json::Value;
 use std::sync::Arc;
 use tokio::sync::mpsc::Receiver;
-use warp::ws::Message;
 
 /// Get the table name from an &str, returning a String
 /// This is used due to TimescaleDB renaming the hypertable using a
@@ -65,7 +65,7 @@ fn send_message(
 
             if to_send {
                 // Send the message to the client
-                if let Err(_disconnected) = client.gate.send(Ok(Message::text(message.to_string())))
+                if let Err(_disconnected) = client.gate.send(Ok(Message::Text(message.to_string())))
                 {
                     error!("Send_message: client disconnected, should be removed soon");
                 }

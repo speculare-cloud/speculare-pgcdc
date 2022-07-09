@@ -6,9 +6,6 @@
 //!   The pattern always follow the same naming convention: "_hyper_(table_creation_order_from_1)_(partition_number)_chunk".
 //!   So we use this array to derive the name of the table from the pattern naming chunk.
 
-#[global_allocator]
-static ALLOC: snmalloc_rs::SnMalloc = snmalloc_rs::SnMalloc;
-
 #[macro_use]
 extern crate log;
 
@@ -35,13 +32,14 @@ use clap_verbosity_flag::InfoLevel;
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::path::Path;
+use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::select;
 use tokio::sync::mpsc;
 
+mod api;
 mod cdc;
-mod server;
 mod utils;
 mod websockets;
 
@@ -54,6 +52,9 @@ struct Args {
     #[clap(flatten)]
     verbose: clap_verbosity_flag::Verbosity<InfoLevel>,
 }
+
+/// Our global unique client id counter.
+static NEXT_CLIENT_ID: AtomicUsize = AtomicUsize::new(1);
 
 #[cfg(feature = "timescale")]
 lazy_static::lazy_static! {
@@ -109,13 +110,20 @@ fn prog() -> Option<String> {
 async fn main() {
     let args = Args::parse();
 
-    // Init logger
-    env_logger::Builder::new()
-        .filter_module(
-            &prog().map_or_else(|| "speculare_pgcdc".to_owned(), |f| f.replace('-', "_")),
-            args.verbose.log_level_filter(),
+    // Define log level
+    if std::env::var("RUST_LOG").is_err() {
+        std::env::set_var(
+            "RUST_LOG",
+            format!(
+                "{}={level},tower_http={level}",
+                &prog().map_or_else(|| "speculare_pgcdc".to_owned(), |f| f.replace('-', "_")),
+                level = args.verbose.log_level_filter()
+            ),
         )
-        .init();
+    }
+
+    // Init logger/tracing
+    tracing_subscriber::fmt::init();
 
     // Construct our default server state
     let server_state = Arc::new(ServerState::default());
@@ -178,5 +186,5 @@ async fn main() {
         })
         .expect("Cannot create the Children for Bastion");
 
-    server::run_server(cserver_state).await
+    api::run_server(cserver_state).await
 }

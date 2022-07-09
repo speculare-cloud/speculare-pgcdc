@@ -6,8 +6,10 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
+sproot = { git = "https://github.com/speculare-cloud/sproot" }
 ahash = "0.7"
 async-trait = "0.1"
+axum = { version = "0.5", features = ["ws", "http1", "http2"] }
 bastion = "0.4"
 bastion-executor = { version = "0.4", features = ["tokio-runtime"] }
 bytes = "1"
@@ -15,21 +17,21 @@ byteorder = "1.4"
 clap = { version = "3.1", features = ["derive"] }
 clap-verbosity-flag = "1.0"
 config = { version = "0.13", features = ["toml"] }
-env_logger = "0.9"
 futures = "0.3"
 lazy_static = "1.4"
 log = "0.4"
 openssl = "0.10"
-postgres-openssl = { git = "https://github.com/MaterializeInc/rust-postgres", rev = "6c65369" }
+postgres-openssl = { git = "https://github.com/MaterializeInc/rust-postgres", rev = "c46e0af" }
 serde = "1.0"
 serde_json = "1.0"
 simd-json = "0.6"
-snmalloc-rs = "0.3"
-tokio-postgres = { git = "https://github.com/MaterializeInc/rust-postgres", rev = "6c65369" }
-tokio = { version = "1", features = ["full"] }
+tokio-postgres = { git = "https://github.com/MaterializeInc/rust-postgres", rev = "c46e0af" }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 tokio-stream = "0.1"
+tower-http = { version = "0.3", features = ["trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid-readable-rs = "0.1"
-warp = { version = "0.3", features = ["tls"] }
 
 [features]
 default = ["timescale"]
