@@ -29,7 +29,6 @@ tokio-postgres = { git = "https://github.com/MaterializeInc/rust-postgres", rev 
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 tokio-stream = "0.1"
 tower-http = { version = "0.3", features = ["trace"] }
-tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid-readable-rs = "0.1"
 

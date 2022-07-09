@@ -1,6 +1,8 @@
 use crate::{
-    utils::specific_filter::{DataType, SpecificFilter},
-    websockets::{self, ServerState, SessionInfo, WsWatchFor, DELETE, INSERT, UPDATE},
+    utils::{
+        specific_filter::{DataType, SpecificFilter},
+        ws_utils::{apply_flag, ServerState, SessionInfo, WsWatchFor, DELETE, INSERT, UPDATE},
+    },
     CONFIG, NEXT_CLIENT_ID, TABLES,
 };
 
@@ -23,7 +25,6 @@ use std::{
 use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
-use tracing::log::{debug, error, info};
 
 pub async fn run_server(state: Arc<ServerState>) {
     // build our application with some routes
@@ -100,7 +101,7 @@ fn parse_ws_query(query: &str) -> Result<WsWatchFor, ApiError> {
     match parts.next() {
         Some(val) => val
             .split(',')
-            .for_each(|ctype| websockets::apply_flag(&mut change_flag, ctype)),
+            .for_each(|ctype| apply_flag(&mut change_flag, ctype)),
         None => {
             return Err(ApiError::ExplicitError(String::from(
                 "the change_type params is not present",

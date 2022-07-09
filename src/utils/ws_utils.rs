@@ -5,8 +5,6 @@ use axum::extract::ws::Message;
 use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
 
-pub mod forwarder;
-
 pub const INSERT: u8 = 1 << 1;
 pub const UPDATE: u8 = 1 << 2;
 pub const DELETE: u8 = 1 << 3;
