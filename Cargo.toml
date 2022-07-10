@@ -9,6 +9,7 @@ edition = "2018"
 sproot = { git = "https://github.com/speculare-cloud/sproot" }
 async-trait = "0.1"
 axum = { version = "0.5", features = ["ws", "http1", "http2"] }
+axum-extra = { version = "0.3", features = ["cookie-signed"], optional = true}
 bastion = "0.4"
 bastion-executor = { version = "0.4", features = ["tokio-runtime"] }
 bytes = "1"
@@ -37,7 +38,7 @@ uuid = { version = "1.1", features = ["v4"], optional = true }
 
 [features]
 default = ["timescale"]
-auth = ["moka", "uuid", "diesel"]
+auth = ["moka", "uuid", "diesel", "axum-extra"]
 timescale = []
 
 [profile.release]

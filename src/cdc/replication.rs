@@ -172,7 +172,7 @@ async fn parse_xlogdata_message(buf: &mut Cursor<Bytes>, sync_lsn: &mut u64, tx:
     let _wal_end = buf.read_u64::<BigEndian>();
     let _ts = buf.read_u64::<BigEndian>();
 
-    trace!("XLogData: wal_pos {}/{:X}", wal_pos >> 32, wal_pos);
+    // trace!("XLogData: wal_pos {}/{:X}", wal_pos >> 32, wal_pos);
 
     let mut data: String = String::with_capacity(32);
     match buf.read_to_string(&mut data) {
