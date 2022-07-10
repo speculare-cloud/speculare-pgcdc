@@ -21,6 +21,9 @@ pub struct Config {
 
     #[cfg(feature = "auth")]
     pub cookie_secret: String,
+    #[cfg(feature = "auth")]
+    pub admin_secret: String,
+
     // AUTH POSTGRESQL CONNECTION
     #[cfg(feature = "auth")]
     pub auth_database_url: String,

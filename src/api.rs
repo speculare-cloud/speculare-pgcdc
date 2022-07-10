@@ -1,5 +1,5 @@
 #[cfg(feature = "auth")]
-use crate::utils::auth::{self, AuthCookie};
+use crate::utils::auth::{self, AuthInfo};
 use crate::{
     utils::{
         query::parse_ws_query,
@@ -60,7 +60,7 @@ pub async fn run_server(state: Arc<ServerState>) {
 }
 
 async fn ws_handler(
-    #[cfg(feature = "auth")] user_id: AuthCookie,
+    #[cfg(feature = "auth")] auth: AuthInfo,
     Extension(state): Extension<Arc<ServerState>>,
     Query(params): Query<HashMap<String, String>>,
     ws: WebSocketUpgrade,
@@ -80,12 +80,14 @@ async fn ws_handler(
 
     #[cfg(feature = "auth")]
     {
-        if watch_for.specific.is_none() {
-            return Err(ApiError::InvalidRequestError(None));
-        }
+        if !auth.is_admin {
+            if watch_for.specific.is_none() {
+                return Err(ApiError::InvalidRequestError(None));
+            }
 
-        let specific = watch_for.specific.clone().unwrap();
-        auth::restrict_auth(user_id, specific).await?;
+            let specific = watch_for.specific.clone().unwrap();
+            auth::restrict_auth(auth, specific).await?;
+        }
     }
 
     Ok(ws.on_upgrade(|socket: WebSocket| async {

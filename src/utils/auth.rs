@@ -1,4 +1,4 @@
-use crate::{AUTHPOOL, CHECKSESSIONS_CACHE};
+use crate::{AUTHPOOL, CHECKSESSIONS_CACHE, CONFIG};
 
 use async_trait::async_trait;
 use axum::{
@@ -19,8 +19,14 @@ pub struct AuthCookie {
     pub user_id: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct AuthInfo {
+    pub is_admin: bool,
+    pub auth_cookie: Option<AuthCookie>,
+}
+
 #[async_trait]
-impl<B> FromRequest<B> for AuthCookie
+impl<B> FromRequest<B> for AuthInfo
 where
     B: Send,
 {
@@ -38,26 +44,46 @@ where
             }
         };
 
+        let mut is_admin = false;
         let spcks = match cookies.get(COOKIE_NAME) {
-            Some(cookie) => cookie,
-            None => return Err((StatusCode::UNAUTHORIZED, "no `SP-CKS` found in cookies")),
+            Some(cookie) => Some(cookie),
+            None => {
+                let adm = req.headers().get("SP-ADM");
+                if adm.is_none() || adm.unwrap().to_str().unwrap() != CONFIG.admin_secret {
+                    return Err((StatusCode::UNAUTHORIZED, "no `SP-CKS` found in cookies"));
+                }
+
+                is_admin = true;
+                None
+            }
         };
 
-        let mut value = spcks.value().to_owned().replace("\\\"", "");
-        match simd_json::from_str::<Self>(&mut value) {
-            Ok(val) => Ok(val),
-            Err(_) => Err((
-                StatusCode::BAD_REQUEST,
-                "cannot find the user_id inside the cookie",
-            )),
-        }
+        let auth_cookie = match spcks {
+            Some(spcks) => {
+                let mut value = spcks.value().to_owned().replace("\\\"", "");
+                match simd_json::from_str::<AuthCookie>(&mut value) {
+                    Ok(val) => Some(val),
+                    Err(_) => {
+                        return Err((
+                            StatusCode::BAD_REQUEST,
+                            "cannot find the user_id inside the cookie",
+                        ))
+                    }
+                }
+            }
+            None => None,
+        };
+
+        Ok(Self {
+            is_admin,
+            auth_cookie,
+        })
     }
 }
 
-pub async fn restrict_auth(
-    auth_cookie: AuthCookie,
-    specific: SpecificFilter,
-) -> Result<(), ApiError> {
+pub async fn restrict_auth(auth: AuthInfo, specific: SpecificFilter) -> Result<(), ApiError> {
+    let auth_cookie = auth.auth_cookie.unwrap();
+
     let sp_value = match as_variant!(specific.value, DataType::String) {
         Some(val) => val,
         None => {
