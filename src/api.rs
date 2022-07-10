@@ -11,6 +11,7 @@ use axum::{
         ws::{Message, WebSocket},
         Query, WebSocketUpgrade,
     },
+    response::Response,
     routing::{any, get},
     Extension, Router,
 };
@@ -55,7 +56,7 @@ async fn ws_handler(
     Extension(state): Extension<Arc<ServerState>>,
     Query(params): Query<HashMap<String, String>>,
     ws: WebSocketUpgrade,
-) -> Result<(), ApiError> {
+) -> Result<Response, ApiError> {
     // Extract the query params or return a bad request
     let query = match params.get("query") {
         Some(q) => q,
@@ -69,7 +70,7 @@ async fn ws_handler(
     // Construct the watch_for from the query and if error, bad request
     let watch_for = parse_ws_query(query)?;
 
-    ws.on_upgrade(|socket: WebSocket| async {
+    Ok(ws.on_upgrade(|socket: WebSocket| async {
         // TODO - Determine if using a UUID would be better (faster)?
         let id = NEXT_CLIENT_ID.fetch_add(1, Ordering::Relaxed);
         trace!("Websocket: client connected: {}", id);
@@ -87,9 +88,7 @@ async fn ws_handler(
         }));
 
         ws_connected(id, tx, user_ws_rx, watch_for, state).await;
-    });
-
-    Ok(())
+    }))
 }
 
 fn parse_ws_query(query: &str) -> Result<WsWatchFor, ApiError> {
@@ -236,7 +235,7 @@ async fn ws_connected(
 }
 
 fn ws_disconnected(id: usize, state: Arc<ServerState>, change_flag: u8) {
-    info!("Websocket: client disconnected: {}", id);
+    trace!("Websocket: client disconnected: {}", id);
     // Stream closed up, so remove from the user list
     state.clients.write().unwrap().remove(&id);
 
