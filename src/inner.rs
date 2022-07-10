@@ -5,7 +5,9 @@ use crate::cdc::{
 };
 use crate::forwarder::start_forwarder;
 use crate::utils::ws_utils::ServerState;
-use crate::{SUPERVISOR, TABLES, TABLES_LOOKUP};
+#[cfg(feature = "timescale")]
+use crate::TABLES_LOOKUP;
+use crate::{SUPERVISOR, TABLES};
 
 use bastion::prelude::BastionContext;
 use bastion::spawn;
