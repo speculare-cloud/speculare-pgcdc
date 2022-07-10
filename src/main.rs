@@ -21,8 +21,16 @@ use bastion::supervisor::{ActorRestartStrategy, RestartStrategy, SupervisorRef};
 use bastion::Bastion;
 use clap::Parser;
 use clap_verbosity_flag::InfoLevel;
+#[cfg(feature = "auth")]
+use diesel::r2d2::ConnectionManager;
+#[cfg(feature = "auth")]
+use diesel::PgConnection;
 use inner::start_inner;
+#[cfg(feature = "auth")]
+use moka::future::Cache;
 use sproot::prog;
+#[cfg(feature = "auth")]
+use sproot::Pool;
 #[cfg(feature = "timescale")]
 use std::collections::HashMap;
 use std::sync::atomic::AtomicUsize;
@@ -54,6 +62,32 @@ lazy_static::lazy_static! {
     // Used with TimescaleDB to lookup the table name (disks may be _hyper_1 for example)
     static ref TABLES_LOOKUP: RwLock<HashMap<i8, String>> = {
         RwLock::new(HashMap::new())
+    };
+}
+
+#[cfg(feature = "auth")]
+lazy_static::lazy_static! {
+    // > time_to_live is set to one hour, after that the key will be evicted and
+    //   we'll need to recheck it from the auth server.
+    static ref CHECKSESSIONS_CACHE: Cache<String, String> = Cache::builder().time_to_live(Duration::from_secs(60 * 60)).build();
+    static ref AUTHPOOL: Pool = {
+        // Init the connection to the postgresql
+        let manager = ConnectionManager::<PgConnection>::new(&CONFIG.auth_database_url);
+        // This step might spam for error CONFIG.database_max_connection of times, this is normal.
+        match r2d2::Pool::builder()
+            .max_size(CONFIG.auth_database_max_connection)
+            .min_idle(Some((10 * CONFIG.auth_database_max_connection) / 100))
+            .build(manager)
+        {
+            Ok(pool) => {
+                info!("R2D2 PostgreSQL pool created");
+                pool
+            }
+            Err(e) => {
+                error!("Failed to create db pool: {}", e);
+                std::process::exit(1);
+            }
+        }
     };
 }
 

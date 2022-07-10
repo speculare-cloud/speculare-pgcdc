@@ -1,12 +1,12 @@
 /// List of supported data type
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DataType {
     String(String),
     Array(Vec<String>),
 }
 
 /// Contains the specific filter applied to the Ws
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SpecificFilter {
     pub column: serde_json::Value,
     pub value: DataType,

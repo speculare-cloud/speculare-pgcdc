@@ -16,12 +16,17 @@ pub struct Config {
     pub database_tls: bool,
 
     // HTTP API CONFIGS
-    #[serde(default = "default_https")]
-    pub https: bool,
-    pub key_priv: Option<String>,
-    pub key_cert: Option<String>,
     #[serde(default = "default_binding")]
     pub binding: String,
+
+    #[cfg(feature = "auth")]
+    pub cookie_secret: String,
+    // AUTH POSTGRESQL CONNECTION
+    #[cfg(feature = "auth")]
+    pub auth_database_url: String,
+    #[cfg(feature = "auth")]
+    #[serde(default = "default_maxconn")]
+    pub auth_database_max_connection: u32,
 }
 
 impl Config {
@@ -39,12 +44,13 @@ impl Config {
     }
 }
 
-fn default_https() -> bool {
+fn default_dbtls() -> bool {
     false
 }
 
-fn default_dbtls() -> bool {
-    false
+#[cfg(feature = "auth")]
+fn default_maxconn() -> u32 {
+    10
 }
 
 fn default_binding() -> String {

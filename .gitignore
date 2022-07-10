@@ -2,3 +2,4 @@
 pgcdc.config
 pgauth.config
 *.lock
+xschema.rs
