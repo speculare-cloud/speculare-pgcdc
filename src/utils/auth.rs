@@ -118,7 +118,7 @@ pub async fn restrict_auth(auth: AuthInfo, specific: SpecificFilter) -> Result<(
 
         let csp = sp_value.clone();
         let exists =
-            tokio::task::block_in_place(move || ApiKey::entry_exists(&mut conn, &uuid, &sp_value))?;
+            tokio::task::spawn_blocking(move || ApiKey::entry_exists(&mut conn, &uuid, &sp_value))?;
 
         if exists {
             CHECKSESSIONS_CACHE.insert(csp, cuid).await;
