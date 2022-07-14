@@ -19,8 +19,9 @@ use axum::{
 };
 #[cfg(feature = "auth")]
 use axum_extra::extract::cookie::Key;
+use axum_server::tls_rustls::RustlsConfig;
 use futures::{stream::SplitStream, FutureExt, StreamExt};
-use sproot::apierrors::ApiError;
+use sproot::{apierrors::ApiError, field_isset};
 use std::{
     collections::{HashMap, HashSet},
     net::SocketAddr,
@@ -52,11 +53,27 @@ pub async fn run_server(state: Arc<ServerState>) {
     };
 
     info!("API served on {}", socket);
+
     // Run the axum server
-    axum::Server::bind(&socket)
+    if !CONFIG.https {
+        axum_server::bind_rustls(
+            socket,
+            RustlsConfig::from_pem_file(
+                field_isset!(CONFIG.key_cert.as_ref(), "key_cert").unwrap(),
+                field_isset!(CONFIG.key_priv.as_ref(), "key_priv").unwrap(),
+            )
+            .await
+            .unwrap(),
+        )
         .serve(app.into_make_service())
         .await
         .unwrap();
+    } else {
+        axum_server::bind(socket)
+            .serve(app.into_make_service())
+            .await
+            .unwrap();
+    }
 }
 
 async fn ws_handler(

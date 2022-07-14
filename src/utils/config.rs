@@ -18,6 +18,10 @@ pub struct Config {
     // HTTP API CONFIGS
     #[serde(default = "default_binding")]
     pub binding: String,
+    #[serde(default = "default_https")]
+    pub https: bool,
+    pub key_priv: Option<String>,
+    pub key_cert: Option<String>,
 
     #[cfg(feature = "auth")]
     pub cookie_secret: String,
@@ -48,6 +52,10 @@ impl Config {
 }
 
 fn default_dbtls() -> bool {
+    false
+}
+
+fn default_https() -> bool {
     false
 }
 

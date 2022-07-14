@@ -10,6 +10,7 @@ sproot = { git = "https://github.com/speculare-cloud/sproot" }
 async-trait = "0.1"
 axum = { version = "0.5", features = ["ws", "http1", "http2"] }
 axum-extra = { version = "0.3", features = ["cookie-signed"], optional = true}
+axum-server = { version = "0.4", features = ["tls-rustls"] }
 bastion = "0.4"
 bastion-executor = { version = "0.4", features = ["tokio-runtime"] }
 bytes = "1"
