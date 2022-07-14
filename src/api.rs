@@ -52,10 +52,10 @@ pub async fn run_server(state: Arc<ServerState>) {
         }
     };
 
-    info!("API served on {}", socket);
 
     // Run the axum server
     if !CONFIG.https {
+		info!("API served on {} (HTTPS)", socket);
         axum_server::bind_rustls(
             socket,
             RustlsConfig::from_pem_file(
@@ -69,6 +69,7 @@ pub async fn run_server(state: Arc<ServerState>) {
         .await
         .unwrap();
     } else {
+		info!("API served on {} (HTTP)", socket);
         axum_server::bind(socket)
             .serve(app.into_make_service())
             .await
