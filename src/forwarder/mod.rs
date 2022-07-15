@@ -1,4 +1,4 @@
-use crate::utils::ws_utils::{apply_flag, ServerState, DELETE, INSERT, UPDATE};
+use crate::api::ws_utils::{self, ServerState, DELETE, INSERT, UPDATE};
 #[cfg(feature = "timescale")]
 use crate::{cdc::extract_hyper_idx, TABLES_LOOKUP};
 
@@ -105,7 +105,7 @@ pub async fn start_forwarder(mut rx: Receiver<String>, server_state: Arc<ServerS
                         let mut change_flag = 0u8;
                         // At this stage, the change_flag can be only be one of INSERT, UPDATE, DELETE
                         // but not multiple of them.
-                        apply_flag(&mut change_flag, change_type);
+                        ws_utils::apply_flag(&mut change_flag, change_type);
                         // Only send the message to those interested in the change_type
                         if has_bit!(change_flag, INSERT) {
                             // First get the lock over the RwLock guard

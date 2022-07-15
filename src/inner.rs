@@ -1,12 +1,14 @@
-use crate::cdc::{
-    connection::db_client_start,
-    replication::{replication_slot_create, replication_stream_poll, replication_stream_start},
-    ExtConfig,
-};
 use crate::forwarder::start_forwarder;
-use crate::utils::ws_utils::ServerState;
 #[cfg(feature = "timescale")]
 use crate::TABLES_LOOKUP;
+use crate::{
+    api::ws_utils::ServerState,
+    cdc::{
+        connection::db_client_start,
+        replication::{replication_slot_create, replication_stream_poll, replication_stream_start},
+        ExtConfig,
+    },
+};
 use crate::{SUPERVISOR, TABLES};
 
 use bastion::prelude::BastionContext;

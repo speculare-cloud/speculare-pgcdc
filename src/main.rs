@@ -15,8 +15,10 @@ macro_rules! has_bit {
     };
 }
 
+use crate::api::server;
 use crate::utils::config::Config;
 
+use api::ws_utils::ServerState;
 use bastion::supervisor::{ActorRestartStrategy, RestartStrategy, SupervisorRef};
 use bastion::Bastion;
 use clap::Parser;
@@ -36,7 +38,6 @@ use std::collections::HashMap;
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-use utils::ws_utils::ServerState;
 
 mod api;
 mod cdc;
@@ -55,7 +56,7 @@ struct Args {
 }
 
 /// Our global unique client id counter.
-static NEXT_CLIENT_ID: AtomicUsize = AtomicUsize::new(1);
+static ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 #[cfg(feature = "timescale")]
 lazy_static::lazy_static! {
@@ -157,5 +158,5 @@ async fn main() {
     start_inner(server_state);
 
     // Start the public api server
-    api::run_server(cserver_state).await
+    server::serve(cserver_state).await
 }

@@ -1,12 +1,11 @@
-use sproot::apierrors::ApiError;
+use super::ws_utils::{self, WsWatchFor};
 
 use crate::{
-    utils::{
-        specific_filter::{DataType, SpecificFilter},
-        ws_utils::{apply_flag, WsWatchFor},
-    },
+    utils::specific_filter::{DataType, SpecificFilter},
     TABLES,
 };
+
+use sproot::apierrors::ApiError;
 
 pub fn parse_ws_query(query: &str) -> Result<WsWatchFor, ApiError> {
     let mut parts = query.split(':');
@@ -16,7 +15,7 @@ pub fn parse_ws_query(query: &str) -> Result<WsWatchFor, ApiError> {
     match parts.next() {
         Some(val) => val
             .split(',')
-            .for_each(|ctype| apply_flag(&mut change_flag, ctype)),
+            .for_each(|ctype| ws_utils::apply_flag(&mut change_flag, ctype)),
         None => {
             return Err(ApiError::ExplicitError(String::from(
                 "the change_type params is not present",

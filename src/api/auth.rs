@@ -1,4 +1,7 @@
-use crate::{AUTHPOOL, CHECKSESSIONS_CACHE, CONFIG};
+use crate::{
+    utils::specific_filter::{DataType, SpecificFilter},
+    AUTHPOOL, CHECKSESSIONS_CACHE, CONFIG,
+};
 
 use async_trait::async_trait;
 use axum::{
@@ -9,8 +12,6 @@ use axum_extra::extract::SignedCookieJar;
 use serde::Deserialize;
 use sproot::{apierrors::ApiError, as_variant, models::ApiKey};
 use uuid::Uuid;
-
-use super::specific_filter::{DataType, SpecificFilter};
 
 const COOKIE_NAME: &str = "SP-CKS";
 

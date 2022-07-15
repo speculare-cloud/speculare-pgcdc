@@ -1,11 +1,9 @@
 #[cfg(feature = "auth")]
-use crate::utils::auth::{self, AuthInfo};
+use super::auth::{self, AuthInfo};
+
 use crate::{
-    utils::{
-        query::parse_ws_query,
-        ws_utils::{ServerState, SessionInfo, WsWatchFor, DELETE, INSERT, UPDATE},
-    },
-    CONFIG, NEXT_CLIENT_ID,
+    api::ws_utils::{DELETE, UPDATE},
+    ID_COUNTER,
 };
 
 use axum::{
@@ -14,69 +12,23 @@ use axum::{
         Query, WebSocketUpgrade,
     },
     response::Response,
-    routing::{any, get},
-    Extension, Router,
+    Extension,
 };
-#[cfg(feature = "auth")]
-use axum_extra::extract::cookie::Key;
-use axum_server::tls_rustls::RustlsConfig;
 use futures::{stream::SplitStream, FutureExt, StreamExt};
-use sproot::{apierrors::ApiError, field_isset};
+use sproot::apierrors::ApiError;
 use std::{
     collections::{HashMap, HashSet},
-    net::SocketAddr,
-    sync::{atomic::Ordering, Arc},
+    sync::Arc,
 };
 use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio_stream::wrappers::UnboundedReceiverStream;
-use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 
-pub async fn run_server(state: Arc<ServerState>) {
-    // build our application with some routes
-    let app = Router::new()
-        .route("/ping", any(|| async { "zpour" }))
-        .route("/ws", get(ws_handler))
-        // logging so we can see whats going on
-        .layer(TraceLayer::new_for_http().make_span_with(DefaultMakeSpan::default()))
-        .layer(Extension(state));
+use super::{
+    query,
+    ws_utils::{ServerState, SessionInfo, WsWatchFor, INSERT},
+};
 
-    #[cfg(feature = "auth")]
-    let app = app.layer(Extension(Key::from(CONFIG.cookie_secret.as_bytes())));
-
-    // Convert the binding into a SocketAddr
-    let socket: SocketAddr = match CONFIG.binding.parse() {
-        Ok(val) => val,
-        Err(e) => {
-            error!("The BINDING is not a valid SocketAddr: {}", e);
-            std::process::exit(1);
-        }
-    };
-
-    // Run the axum server
-    if CONFIG.https {
-        info!("API served on {} (HTTPS)", socket);
-        axum_server::bind_rustls(
-            socket,
-            RustlsConfig::from_pem_file(
-                field_isset!(CONFIG.key_cert.as_ref(), "key_cert").unwrap(),
-                field_isset!(CONFIG.key_priv.as_ref(), "key_priv").unwrap(),
-            )
-            .await
-            .unwrap(),
-        )
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
-    } else {
-        info!("API served on {} (HTTP)", socket);
-        axum_server::bind(socket)
-            .serve(app.into_make_service())
-            .await
-            .unwrap();
-    }
-}
-
-async fn ws_handler(
+pub async fn accept_conn(
     #[cfg(feature = "auth")] auth: AuthInfo,
     Extension(state): Extension<Arc<ServerState>>,
     Query(params): Query<HashMap<String, String>>,
@@ -93,7 +45,7 @@ async fn ws_handler(
     };
 
     // Construct the watch_for from the query and if error, bad request
-    let watch_for = parse_ws_query(query)?;
+    let watch_for = query::parse_ws_query(query)?;
 
     #[cfg(feature = "auth")]
     {
@@ -108,8 +60,7 @@ async fn ws_handler(
     }
 
     Ok(ws.on_upgrade(|socket: WebSocket| async {
-        // TODO - Determine if using a UUID would be better (faster)?
-        let id = NEXT_CLIENT_ID.fetch_add(1, Ordering::Relaxed);
+        let id = ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         trace!("Websocket: client connected: {}", id);
 
         // Split the socket into a sender and receive of messages.
