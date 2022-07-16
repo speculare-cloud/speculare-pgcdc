@@ -1,6 +1,6 @@
 use crate::{
     utils::specific_filter::{DataType, SpecificFilter},
-    AUTHPOOL, CHECKSESSIONS_CACHE, CONFIG,
+    AUTHPOOL, CHECKAPI_CACHE, CHECKSESSIONS_CACHE, CONFIG,
 };
 
 use async_trait::async_trait;
@@ -133,6 +133,48 @@ pub async fn restrict_auth(auth: AuthInfo, specific: SpecificFilter) -> Result<(
 
     if specific.column == "customer_id" && sp_value == auth_cookie.user_id {
         return Ok(());
+    }
+
+    if specific.column == "key" {
+        // Parse the user_id into a UUID
+        let uuid = match Uuid::parse_str(&auth_cookie.user_id) {
+            Ok(uuid) => uuid,
+            Err(_) => {
+                return Err(ApiError::InvalidRequestError(None));
+            }
+        };
+
+        // If the keys exists in the cache but it's not for the same user, error
+        if let Some(cached) = CHECKAPI_CACHE.get(&sp_value) {
+            if cached == uuid {
+                trace!("CheckSessions: cache hit for {}", &sp_value);
+                return Ok(());
+            } else {
+                return Err(ApiError::AuthorizationError(None));
+            }
+        }
+
+        // Get a conn from the auth_db's pool
+        let mut conn = match AUTHPOOL.get() {
+            Ok(conn) => conn,
+            Err(err) => {
+                error!("failed to get a conn: {}", err);
+                return Err(ApiError::ServerError(None));
+            }
+        };
+
+        let csp = sp_value.clone();
+        let exists =
+            tokio::task::spawn_blocking(move || ApiKey::entry_exists(&mut conn, &uuid, &sp_value))
+                .await
+                .map_err(|_| ApiError::ServerError(None))??;
+
+        if exists {
+            CHECKAPI_CACHE.insert(csp, uuid).await;
+            return Ok(());
+        }
+
+        return Err(ApiError::AuthorizationError(None));
     }
 
     Err(ApiError::AuthorizationError(None))

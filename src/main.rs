@@ -38,6 +38,7 @@ use std::collections::HashMap;
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+use uuid::Uuid;
 
 mod api;
 mod cdc;
@@ -71,6 +72,7 @@ lazy_static::lazy_static! {
     // > time_to_live is set to one hour, after that the key will be evicted and
     //   we'll need to recheck it from the auth server.
     static ref CHECKSESSIONS_CACHE: Cache<String, String> = Cache::builder().time_to_live(Duration::from_secs(60 * 60)).build();
+    static ref CHECKAPI_CACHE: Cache<String, Uuid> = Cache::builder().time_to_live(Duration::from_secs(60 * 60)).build();
     static ref AUTHPOOL: Pool = {
         // Init the connection to the postgresql
         let manager = ConnectionManager::<PgConnection>::new(&CONFIG.auth_database_url);
