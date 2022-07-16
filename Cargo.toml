@@ -20,9 +20,9 @@ clap-verbosity-flag = "1.0"
 config = { version = "0.13", features = ["toml"] }
 diesel = { version = "2.0.0-rc.0", features = ["postgres", "r2d2", "chrono"], optional = true }
 futures = "0.3"
-lazy_static = "1.4"
 log = "0.4"
 moka = { version = "0.9", features = ["future"], optional = true }
+once_cell = "1.13"
 openssl = "0.10"
 postgres-openssl = { git = "https://github.com/MaterializeInc/rust-postgres", rev = "c46e0af" }
 r2d2 = "0.8"

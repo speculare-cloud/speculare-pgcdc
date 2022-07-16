@@ -1,6 +1,7 @@
 use byteorder::{BigEndian, ReadBytesExt};
 use bytes::{BufMut, Bytes, BytesMut};
 use futures::{SinkExt, StreamExt};
+use once_cell::sync::Lazy;
 use std::{
     io::{Cursor, Read},
     pin::Pin,
@@ -13,9 +14,8 @@ const TIME_SEC_CONVERSION: u64 = 946_684_800;
 const XLOG_DATA_TAG: u8 = b'w';
 const PRIMARY_KEEPALIVE_TAG: u8 = b'k';
 
-lazy_static::lazy_static! {
-    static ref EPOCH: SystemTime = UNIX_EPOCH + Duration::from_secs(TIME_SEC_CONVERSION);
-}
+static EPOCH: Lazy<SystemTime> =
+    Lazy::new(|| UNIX_EPOCH + Duration::from_secs(TIME_SEC_CONVERSION));
 
 #[inline]
 pub fn current_time() -> u64 {

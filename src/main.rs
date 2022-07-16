@@ -24,6 +24,7 @@ use bastion::Bastion;
 use clap::Parser;
 use clap_verbosity_flag::InfoLevel;
 use inner::start_inner;
+use once_cell::sync::Lazy;
 use sproot::prog;
 #[cfg(feature = "timescale")]
 use std::collections::HashMap;
@@ -57,58 +58,25 @@ struct Args {
 static ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 #[cfg(feature = "timescale")]
-lazy_static::lazy_static! {
-    // Used with TimescaleDB to lookup the table name (disks may be _hyper_1 for example)
-    static ref TABLES_LOOKUP: RwLock<HashMap<i8, String>> = {
-        RwLock::new(HashMap::new())
-    };
-}
+// Used with TimescaleDB to lookup the table name (disks may be _hyper_1 for example)
+static TABLES_LOOKUP: Lazy<RwLock<HashMap<i8, String>>> = Lazy::new(|| RwLock::new(HashMap::new()));
 
-#[cfg(feature = "auth")]
-lazy_static::lazy_static! {
-    // > time_to_live is set to one hour, after that the key will be evicted and
-    //   we'll need to recheck it from the auth server.
-    static ref CHECKSESSIONS_CACHE: Cache<String, String> = Cache::builder().time_to_live(Duration::from_secs(60 * 60)).build();
-    static ref CHECKAPI_CACHE: Cache<String, Uuid> = Cache::builder().time_to_live(Duration::from_secs(60 * 60)).build();
-    static ref AUTHPOOL: Pool = {
-        // Init the connection to the postgresql
-        let manager = ConnectionManager::<PgConnection>::new(&CONFIG.auth_database_url);
-        // This step might spam for error CONFIG.database_max_connection of times, this is normal.
-        match r2d2::Pool::builder()
-            .max_size(CONFIG.auth_database_max_connection)
-            .min_idle(Some((10 * CONFIG.auth_database_max_connection) / 100))
-            .build(manager)
-        {
-            Ok(pool) => {
-                info!("R2D2 PostgreSQL pool created");
-                pool
-            }
-            Err(e) => {
-                error!("Failed to create db pool: {}", e);
-                std::process::exit(1);
-            }
-        }
-    };
-}
+// Lazy static of the Config which is loaded from the config file
+static CONFIG: Lazy<Config> = Lazy::new(|| match Config::new() {
+    Ok(config) => config,
+    Err(e) => {
+        error!("Cannot build the Config: {}", e);
+        std::process::exit(1);
+    }
+});
 
-lazy_static::lazy_static! {
-    // Which table are allowed (hard defined at startup for now)
-    // Allow us to avoid accepting websocket which will never be triggered
-    static ref TABLES: RwLock<Vec<String>> = {
-        RwLock::new(Vec::new())
-    };
+// Which table are allowed (hard defined at startup for now)
+// Allow us to avoid accepting websocket which will never be triggered
+static TABLES: Lazy<RwLock<Vec<String>>> = Lazy::new(|| RwLock::new(Vec::new()));
 
-    // Lazy static of the Config which is loaded from the config file
-    static ref CONFIG: Config = match Config::new() {
-        Ok(config) => config,
-        Err(e) => {
-            error!("Cannot build the Config: {:?}", e);
-            std::process::exit(1);
-        }
-    };
-
-    // Bastion supervisor used to define a custom restart policy for the children
-    static ref SUPERVISOR: SupervisorRef = match Bastion::supervisor(|sp| {
+// Bastion supervisor used to define a custom restart policy for the children
+static SUPERVISOR: Lazy<SupervisorRef> = Lazy::new(|| {
+    match Bastion::supervisor(|sp| {
         sp.with_restart_strategy(RestartStrategy::default().with_actor_restart_strategy(
             ActorRestartStrategy::LinearBackOff {
                 timeout: Duration::from_secs(3),
@@ -120,8 +88,8 @@ lazy_static::lazy_static! {
             error!("Cannot create the Bastion supervisor: {:?}", err);
             std::process::exit(1);
         }
-    };
-}
+    }
+});
 
 #[tokio::main]
 async fn main() {

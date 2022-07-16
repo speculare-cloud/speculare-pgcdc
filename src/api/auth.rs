@@ -15,6 +15,38 @@ use uuid::Uuid;
 
 const COOKIE_NAME: &str = "SP-CKS";
 
+static CHECKSESSIONS_CACHE: Lazy<Cache<String, String>> = Lazy::new(|| {
+    Cache::builder()
+        .time_to_live(Duration::from_secs(60 * 60))
+        .build()
+});
+
+static CHECKAPI_CACHE: Lazy<Cache<String, Uuid>> = Lazy::new(|| {
+    Cache::builder()
+        .time_to_live(Duration::from_secs(60 * 60))
+        .build()
+});
+
+pub static AUTHPOOL: Lazy<Pool> = Lazy::new(|| {
+    // Init the connection to the postgresql
+    let manager = ConnectionManager::<PgConnection>::new(&CONFIG.auth_database_url);
+    // This step might spam for error CONFIG.database_max_connection of times, this is normal.
+    match r2d2::Pool::builder()
+        .max_size(CONFIG.auth_database_max_connection)
+        .min_idle(Some((10 * CONFIG.auth_database_max_connection) / 100))
+        .build(manager)
+    {
+        Ok(pool) => {
+            info!("R2D2 PostgreSQL pool created");
+            pool
+        }
+        Err(e) => {
+            error!("Failed to create db pool: {}", e);
+            std::process::exit(1);
+        }
+    }
+});
+
 #[derive(Debug, Deserialize)]
 pub struct AuthCookie {
     pub user_id: String,
