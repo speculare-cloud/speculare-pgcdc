@@ -23,23 +23,19 @@ use bastion::supervisor::{ActorRestartStrategy, RestartStrategy, SupervisorRef};
 use bastion::Bastion;
 use clap::Parser;
 use clap_verbosity_flag::InfoLevel;
-#[cfg(feature = "auth")]
-use diesel::r2d2::ConnectionManager;
-#[cfg(feature = "auth")]
-use diesel::PgConnection;
 use inner::start_inner;
-#[cfg(feature = "auth")]
-use moka::future::Cache;
 use sproot::prog;
-#[cfg(feature = "auth")]
-use sproot::Pool;
 #[cfg(feature = "timescale")]
 use std::collections::HashMap;
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+
 #[cfg(feature = "auth")]
-use uuid::Uuid;
+use {
+    diesel::r2d2::ConnectionManager, diesel::PgConnection, moka::future::Cache, sproot::Pool,
+    uuid::Uuid,
+};
 
 mod api;
 mod cdc;
