@@ -38,6 +38,7 @@ use std::collections::HashMap;
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+#[cfg(feature = "auth")]
 use uuid::Uuid;
 
 mod api;
