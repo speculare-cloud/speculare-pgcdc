@@ -165,7 +165,7 @@ pub async fn restrict_auth(auth: AuthInfo, specific: SpecificFilter) -> Result<(
 
         let csp = sp_value.clone();
         let exists =
-            tokio::task::spawn_blocking(move || ApiKey::entry_exists(&mut conn, &uuid, &sp_value))
+            tokio::task::spawn_blocking(move || ApiKey::own_key(&mut conn, &uuid, &sp_value))
                 .await
                 .map_err(|_| ApiError::ServerError(None))??;
 
