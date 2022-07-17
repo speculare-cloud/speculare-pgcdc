@@ -1,6 +1,8 @@
+use std::time::Duration;
+
 use crate::{
     utils::specific_filter::{DataType, SpecificFilter},
-    AUTHPOOL, CHECKAPI_CACHE, CHECKSESSIONS_CACHE, CONFIG,
+    CONFIG,
 };
 
 use async_trait::async_trait;
@@ -9,8 +11,11 @@ use axum::{
     http::StatusCode,
 };
 use axum_extra::extract::SignedCookieJar;
+use diesel::{r2d2::ConnectionManager, PgConnection};
+use moka::future::Cache;
+use once_cell::sync::Lazy;
 use serde::Deserialize;
-use sproot::{apierrors::ApiError, as_variant, models::ApiKey};
+use sproot::{apierrors::ApiError, as_variant, models::ApiKey, Pool};
 use uuid::Uuid;
 
 const COOKIE_NAME: &str = "SP-CKS";
@@ -150,10 +155,11 @@ pub async fn restrict_auth(auth: AuthInfo, specific: SpecificFilter) -> Result<(
         };
 
         let csp = sp_value.clone();
-        let exists =
-            tokio::task::spawn_blocking(move || ApiKey::entry_exists(&mut conn, &uuid, &sp_value))
-                .await
-                .map_err(|_| ApiError::ServerError(None))??;
+        let exists = tokio::task::spawn_blocking(move || {
+            ApiKey::exists_by_owner_and_host(&mut conn, &uuid, &sp_value)
+        })
+        .await
+        .map_err(|_| ApiError::ServerError(None))??;
 
         if exists {
             CHECKSESSIONS_CACHE.insert(csp, cuid).await;
@@ -196,10 +202,11 @@ pub async fn restrict_auth(auth: AuthInfo, specific: SpecificFilter) -> Result<(
         };
 
         let csp = sp_value.clone();
-        let exists =
-            tokio::task::spawn_blocking(move || ApiKey::own_key(&mut conn, &uuid, &sp_value))
-                .await
-                .map_err(|_| ApiError::ServerError(None))??;
+        let exists = tokio::task::spawn_blocking(move || {
+            ApiKey::exists_by_owner_and_key(&mut conn, &uuid, &sp_value)
+        })
+        .await
+        .map_err(|_| ApiError::ServerError(None))??;
 
         if exists {
             CHECKAPI_CACHE.insert(csp, uuid).await;

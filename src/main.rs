@@ -32,12 +32,6 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
-#[cfg(feature = "auth")]
-use {
-    diesel::r2d2::ConnectionManager, diesel::PgConnection, moka::future::Cache, sproot::Pool,
-    uuid::Uuid,
-};
-
 mod api;
 mod cdc;
 mod forwarder;
