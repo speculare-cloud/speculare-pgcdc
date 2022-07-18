@@ -12,7 +12,7 @@ use tokio_postgres::{Client, CopyBothDuplex, SimpleQueryMessage, SimpleQueryRow}
 
 const TIME_SEC_CONVERSION: u64 = 946_684_800;
 const XLOG_DATA_TAG: u8 = b'w';
-const _PRIMARY_KEEPALIVE_TAG: u8 = b'k';
+const PRIMARY_KEEPALIVE_TAG: u8 = b'k';
 
 static EPOCH: Lazy<SystemTime> =
     Lazy::new(|| UNIX_EPOCH + Duration::from_secs(TIME_SEC_CONVERSION));
@@ -129,17 +129,17 @@ pub async fn replication_stream_poll(duplex_stream: CopyBothDuplex<Bytes>, tx: S
                             }
                             // The keepalive here is not mandatory as we already send a keepalive every 10s
                             // but for the sake of stableness, I keep it here.
-                            // NOTE: Disabled because when the database is restarting -> will spam with reply
-                            //       because it seems that PostgreSQL will send the request over and over again.
-                            // PRIMARY_KEEPALIVE_TAG => {
-                            //     match parse_keepalive_message(&mut boxed, &mut buf, &mut sync_lsn).await {
-                            //         Ok(_) => {},
-                            //         Err(e) => {
-                            //             error!("Replication: parse_keepalive_message failed: {}", e);
-                            //             return;
-                            //         }
-                            //     }
-                            // }
+                            PRIMARY_KEEPALIVE_TAG => {
+                                // NOTE: Disabled because when the database is restarting -> will spam with reply
+                                //       because it seems that PostgreSQL will send the request over and over again.
+                                // match parse_keepalive_message(&mut boxed, &mut buf, &mut sync_lsn).await {
+                                //     Ok(_) => {},
+                                //     Err(e) => {
+                                //         error!("Replication: parse_keepalive_message failed: {}", e);
+                                //         return;
+                                //     }
+                                // }
+                            }
                             _ => {
                                 error!("Replication: Unknown streaming message type: `{}`", tag);
                                 continue;
