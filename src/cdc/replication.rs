@@ -12,7 +12,7 @@ use tokio_postgres::{Client, CopyBothDuplex, SimpleQueryMessage, SimpleQueryRow}
 
 const TIME_SEC_CONVERSION: u64 = 946_684_800;
 const XLOG_DATA_TAG: u8 = b'w';
-const PRIMARY_KEEPALIVE_TAG: u8 = b'k';
+const _PRIMARY_KEEPALIVE_TAG: u8 = b'k';
 
 static EPOCH: Lazy<SystemTime> =
     Lazy::new(|| UNIX_EPOCH + Duration::from_secs(TIME_SEC_CONVERSION));
@@ -93,6 +93,9 @@ pub async fn replication_stream_start(
 /// Tries to read and process one message from a replication stream, using async I/O.
 pub async fn replication_stream_poll(duplex_stream: CopyBothDuplex<Bytes>, tx: Sender<String>) {
     let mut boxed = Box::pin(duplex_stream);
+    // PostgreSQL will default timeout at 1min so 10s is pretty much "ok".
+    // Even in case where there's a lot of messages to handle, the tokio::select should
+    // take the interval.tick() at least once :)
     let mut interval = tokio::time::interval(Duration::from_secs(10));
     let mut sync_lsn: u64 = 0;
 
@@ -126,15 +129,17 @@ pub async fn replication_stream_poll(duplex_stream: CopyBothDuplex<Bytes>, tx: S
                             }
                             // The keepalive here is not mandatory as we already send a keepalive every 10s
                             // but for the sake of stableness, I keep it here.
-                            PRIMARY_KEEPALIVE_TAG => {
-                                match parse_keepalive_message(&mut boxed, &mut buf, &mut sync_lsn).await {
-                                    Ok(_) => {},
-                                    Err(e) => {
-                                        error!("Replication: parse_keepalive_message failed: {}", e);
-                                        return;
-                                    }
-                                }
-                            }
+                            // NOTE: Disabled because when the database is restarting -> will spam with reply
+                            //       because it seems that PostgreSQL will send the request over and over again.
+                            // PRIMARY_KEEPALIVE_TAG => {
+                            //     match parse_keepalive_message(&mut boxed, &mut buf, &mut sync_lsn).await {
+                            //         Ok(_) => {},
+                            //         Err(e) => {
+                            //             error!("Replication: parse_keepalive_message failed: {}", e);
+                            //             return;
+                            //         }
+                            //     }
+                            // }
                             _ => {
                                 error!("Replication: Unknown streaming message type: `{}`", tag);
                                 continue;
@@ -206,7 +211,7 @@ async fn parse_xlogdata_message(buf: &mut Cursor<Bytes>, sync_lsn: &mut u64, tx:
 ///        since midnight on 2000-01-01.
 /// - u8: 1 means that the client should reply to this message as soon as possible,
 ///       to avoid a timeout disconnect. 0 otherwise.
-async fn parse_keepalive_message(
+async fn _parse_keepalive_message(
     conn: &mut Pin<Box<CopyBothDuplex<Bytes>>>,
     buf: &mut Cursor<Bytes>,
     sync_lsn: &mut u64,
