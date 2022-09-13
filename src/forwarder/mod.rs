@@ -80,7 +80,7 @@ pub async fn start_forwarder(mut rx: Receiver<String>, server_state: Arc<ServerS
             Some(mut value) => {
                 // Convert the data to a Value enum of serde_json
                 // Using simd optimization through simd_json crate.
-                let data: Value = simd_json::from_str(&mut value).unwrap();
+                let data: Value = unsafe { simd_json::from_str(&mut value) }.unwrap();
                 // Extract what we really want and assert that it exists
                 let changes = match data["change"].as_array() {
                     Some(val) => val,

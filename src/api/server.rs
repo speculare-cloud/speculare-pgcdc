@@ -1,3 +1,5 @@
+#[cfg(feature = "auth")]
+use super::AppState;
 use super::{ws_handler, ws_utils::ServerState};
 
 use crate::CONFIG;
@@ -13,17 +15,22 @@ use sproot::{apierrors::ApiError, field_isset};
 use std::{net::SocketAddr, sync::Arc};
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 
-pub async fn serve(state: Arc<ServerState>) {
+pub async fn serve(serv_state: Arc<ServerState>) {
+    #[cfg(feature = "auth")]
+    let state = AppState {
+        key: Key::from(CONFIG.cookie_secret.as_bytes()),
+    };
+
     // build our application with some routes
     let app = Router::new()
         .route("/ping", any(|| async { "zpour" }))
         .route("/ws", get(ws_handler::accept_conn))
         // logging so we can see whats going on
         .layer(TraceLayer::new_for_http().make_span_with(DefaultMakeSpan::default()))
-        .layer(Extension(state));
+        .layer(Extension(serv_state));
 
     #[cfg(feature = "auth")]
-    let app = app.layer(Extension(Key::from(CONFIG.cookie_secret.as_bytes())));
+    let app = app.with_state(state);
 
     // Convert the binding into a SocketAddr
     let socket: SocketAddr = match CONFIG.binding.parse() {

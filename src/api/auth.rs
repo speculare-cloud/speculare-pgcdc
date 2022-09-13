@@ -7,8 +7,8 @@ use crate::{
 
 use async_trait::async_trait;
 use axum::{
-    extract::{FromRequest, RequestParts},
-    http::StatusCode,
+    extract::{FromRef, FromRequestParts},
+    http::{request::Parts, StatusCode},
 };
 use axum_extra::extract::SignedCookieJar;
 use diesel::{r2d2::ConnectionManager, PgConnection};
@@ -17,6 +17,8 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 use sproot::{apierrors::ApiError, as_variant, models::ApiKey, Pool};
 use uuid::Uuid;
+
+use super::AppState;
 
 const COOKIE_NAME: &str = "SP-CKS";
 
@@ -64,29 +66,31 @@ pub struct AuthInfo {
 }
 
 #[async_trait]
-impl<B> FromRequest<B> for AuthInfo
+impl<B> FromRequestParts<B> for AuthInfo
 where
-    B: Send,
+    B: Send + Sync,
+    AppState: FromRef<B>,
 {
     type Rejection = (StatusCode, &'static str);
 
-    async fn from_request(req: &mut RequestParts<B>) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(req: &mut Parts, state: &B) -> Result<Self, Self::Rejection> {
         // dbg!("Cookies: {:?}", req.headers().get(COOKIE).split(';'));
-        let cookies: SignedCookieJar = match SignedCookieJar::from_request(req).await {
-            Ok(cookies) => cookies,
-            Err(_) => {
-                return Err((
-                    StatusCode::BAD_REQUEST,
-                    "you need to send a signed cookies along with your request",
-                ))
-            }
-        };
+        let cookies: SignedCookieJar<AppState> =
+            match SignedCookieJar::from_request_parts(req, state).await {
+                Ok(cookies) => cookies,
+                Err(_) => {
+                    return Err((
+                        StatusCode::BAD_REQUEST,
+                        "you need to send a signed cookies along with your request",
+                    ))
+                }
+            };
 
         let mut is_admin = false;
         let spcks = match cookies.get(COOKIE_NAME) {
             Some(cookie) => Some(cookie),
             None => {
-                let adm = req.headers().get("SP-ADM");
+                let adm = req.headers.get("SP-ADM");
                 if adm.is_none() || adm.unwrap().to_str().unwrap() != CONFIG.admin_secret {
                     return Err((StatusCode::UNAUTHORIZED, "no `SP-CKS` found in cookies"));
                 }
@@ -99,7 +103,7 @@ where
         let auth_cookie = match spcks {
             Some(spcks) => {
                 let mut value = spcks.value().to_owned().replace("\\\"", "");
-                match simd_json::from_str::<AuthCookie>(&mut value) {
+                match unsafe { simd_json::from_str::<AuthCookie>(&mut value) } {
                     Ok(val) => Some(val),
                     Err(_) => {
                         return Err((
