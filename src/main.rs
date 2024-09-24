@@ -1,10 +1,10 @@
 //! Quick note about the database table name due to Tailscale:
-//! > Static array to hold the tables in the order of creation in the database.
-//!   As we use TimescaleDB, each table get partitioned using a pattern like "_hyper_x_y_chunk",
-//!   which don't give us the opportunity to detect which table is being updated/inserted.
-//!   As the client will connect to the WS using the base table name, this array is used for lookup.
-//!   The pattern always follow the same naming convention: "_hyper_(table_creation_order_from_1)_(partition_number)_chunk".
-//!   So we use this array to derive the name of the table from the pattern naming chunk.
+//! Static array to hold the tables in the order of creation in the database.
+//! As we use TimescaleDB, each table get partitioned using a pattern like "_hyper_x_y_chunk",
+//! which don't give us the opportunity to detect which table is being updated/inserted.
+//! As the client will connect to the WS using the base table name, this array is used for lookup.
+//! The pattern always follow the same naming convention: "_hyper_(table_creation_order_from_1)_(partition_number)_chunk".
+//! So we use this array to derive the name of the table from the pattern naming chunk.
 
 #[macro_use]
 extern crate log;
