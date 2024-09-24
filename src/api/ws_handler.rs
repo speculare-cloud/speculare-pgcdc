@@ -17,7 +17,7 @@ use axum::{
 use futures::{stream::SplitStream, FutureExt, StreamExt};
 use sproot::apierrors::ApiError;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     sync::Arc,
 };
 use tokio::sync::mpsc::{self, UnboundedSender};
@@ -104,7 +104,7 @@ async fn ws_connected(
             .write()
             .unwrap()
             .entry(change_table.clone())
-            .or_insert_with(HashSet::new)
+            .or_default()
             .insert(id);
     }
     if has_bit!(change_flag, UPDATE) {
@@ -113,7 +113,7 @@ async fn ws_connected(
             .write()
             .unwrap()
             .entry(change_table.clone())
-            .or_insert_with(HashSet::new)
+            .or_default()
             .insert(id);
     }
     if has_bit!(change_flag, DELETE) {
@@ -122,7 +122,7 @@ async fn ws_connected(
             .write()
             .unwrap()
             .entry(change_table)
-            .or_insert_with(HashSet::new)
+            .or_default()
             .insert(id);
     }
 
