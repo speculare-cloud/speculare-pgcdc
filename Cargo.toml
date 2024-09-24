@@ -1,6 +1,6 @@
 [package]
 name = "speculare-pgcdc"
-version = "0.0.10"
+version = "0.1.1"
 authors = ["Martichou <martichou.andre@gmail.com>"]
 edition = "2018"
 
