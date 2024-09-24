@@ -16,10 +16,7 @@ use axum::{
 };
 use futures::{stream::SplitStream, FutureExt, StreamExt};
 use sproot::apierrors::ApiError;
-use std::{
-    collections::HashMap,
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 

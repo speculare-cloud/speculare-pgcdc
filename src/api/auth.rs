@@ -12,7 +12,7 @@ use axum::{
 };
 use axum_extra::extract::SignedCookieJar;
 use diesel::{r2d2::ConnectionManager, PgConnection};
-use moka::future::Cache;
+use moka::sync::Cache;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use sproot::{apierrors::ApiError, as_variant, models::ApiKey, Pool};
@@ -166,7 +166,7 @@ pub async fn restrict_auth(auth: AuthInfo, specific: SpecificFilter) -> Result<(
         .map_err(|_| ApiError::ServerError(None))??;
 
         if exists {
-            CHECKSESSIONS_CACHE.insert(csp, cuid).await;
+            CHECKSESSIONS_CACHE.insert(csp, cuid);
             return Ok(());
         }
 
@@ -213,7 +213,7 @@ pub async fn restrict_auth(auth: AuthInfo, specific: SpecificFilter) -> Result<(
         .map_err(|_| ApiError::ServerError(None))??;
 
         if exists {
-            CHECKAPI_CACHE.insert(csp, uuid).await;
+            CHECKAPI_CACHE.insert(csp, uuid);
             return Ok(());
         }
 
