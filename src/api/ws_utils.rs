@@ -57,12 +57,6 @@ pub fn apply_flag(flag: &mut u8, ctype: &str) {
     }
 }
 
-/// Contains info for which table/event/filter we're listening
-#[derive(serde::Deserialize)]
-pub struct ListQueryParams {
-    pub query: String,
-}
-
 /// Server state for WebSocket
 #[derive(Default, Clone)]
 pub struct ServerState {
